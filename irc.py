@@ -35,5 +35,14 @@ class IRC:
 
         if resp.find('PING') != -1:
             self.irc.send(bytes('PONG ' + resp.split()[1] + '\r\n', "UTF-8"))
-
         return resp
+
+    def die(self, channel):
+        self.irc.send(bytes("QUIT " + channel + "\n", "UTF-8"))
+        return
+
+    def name_all(self, channel):
+        self.irc.send(bytes("NAMES " + channel + "\n", "UTF-8"))
+        time.sleep(1)
+        resp = self.irc.recv(353).decode("UTF-8")
+        return resp.split(':')[2]
