@@ -27,7 +27,8 @@ class ChatBot:
         self.channel = channel
         self.server = server
         self.state = State.START
-        self.history = []
+        self.sent_history = []
+        self.recv_history = []
         self.wants_answer = False
         self.irc = IRC(timeout=timeout)
         self.connect(server, channel, nick)
@@ -50,6 +51,16 @@ class ChatBot:
             self.inquiry_reinquiry()
         elif self.state == State.SENT_INQUIRY_REPLY:
             self.end()
+
+    def forget(self, user):
+        self.sent_history = []
+        self.recv_history = []
+        self.state = State.START
+        self.irc.send(self.channel, user, "Forget what? And who are you?")
+
+    def send_message(self, user, msg):
+        self.irc.send(self.channel, user, msg)
+        self.sent_history.append(msg)
 
     def end(self):
         time.sleep(1)
@@ -75,7 +86,8 @@ class ChatBot:
             "Good " + time_of_day() + "!"
         ]
         response = random.choice(responses)
-        self.irc.send(self.channel, None, response)
+        #self.irc.send(self.channel, None, response)
+        self.send_message(None, response)
         self.state = State.SENT_OUTREACH
 
     def secondary_outreach(self):
@@ -86,29 +98,35 @@ class ChatBot:
             "Is anyone out theeere?"
         ]
         response = random.choice(responses)
-        self.irc.send(self.channel, None, response)
+        #self.irc.send(self.channel, None, response)
+        self.send_message(None, response)
         self.state = State.SENT_OUTREACH_TWICE
 
     def outreach_reply(self):
         # SPEAKING SECOND.
         # Reach this from State START
         response = "outreach reply (You spoke first)"
-        self.irc.send(self.channel, None, response)
+        #self.irc.send(self.channel, None, response)
+        # this None needs to get changed... (AND THE ONES BELOW)
+        self.send_message(None, response)
         self.state = State.SENT_OUTREACH_REPLY
 
     def inquiry(self):
         response = "inquiry (You spoke second)"
-        self.irc.send(self.channel, None, response)
+        #self.irc.send(self.channel, None, response)
+        self.send_message(None, response)
         self.state = State.SENT_INQUIRY
 
     def inquiry_reply(self):
         response = "inquiry reply (You spoke second)"
-        self.irc.send(self.channel, None, response)
+        #self.irc.send(self.channel, None, response)
+        self.send_message(None, response)
         self.end()
 
     def inquiry_reinquiry(self):
         response = "inquiry reply + inquiry (You spoke first)"
-        self.irc.send(self.channel, None, response)
+        #self.irc.send(self.channel, None, response)
+        self.send_message(None, response)
         self.state = State.SENT_INQUIRY_REPLY
 
     def handle_timeout(self):
@@ -141,14 +159,13 @@ class ChatBot:
                 text = text.split(':', 3)
                 user = text[1].split('!')[0]
                 recv_msg = text[3].lstrip(" ").rstrip("\r\n")
-                self.history.append(word_tokenize(recv_msg))
-                print(recv_msg)
+                self.recv_history.append(recv_msg)
+                print("Received:", recv_msg)
 
                 # 3 builtins: forget, die, name all
+                # these won't use self.send_message because we don't actually want to log these
                 if "forget" == recv_msg:
-                    responses = []
-                    self.history = []
-                    self.irc.send(self.channel, user, "Forget what? And who are you?")
+                    self.forget(user)
                 elif "die" == recv_msg:
                     self.irc.send(self.channel, user, "So long and thanks for all the phish...")
                     self.irc.die(self.channel)
