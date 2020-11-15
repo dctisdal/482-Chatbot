@@ -15,6 +15,9 @@ class State:
     SENT_INQUIRY        = 5
     SENT_INQUIRY_REPLY  = 6
 
+class PacketID:
+    NAME_REPLY          = "353"
+
 def time_of_day():
     hour = datetime.datetime.now().time().hour
     if hour <= 11:
@@ -89,6 +92,11 @@ class ChatBot:
     def send_message(self, user, msg):
 
         self.irc.send(self.channel, user, msg)
+        self.sent_history.append(msg)
+
+    def send_name_all(self, user, msg):
+
+        self.irc.name_all(self.channel)
         self.sent_history.append(msg)
 
     def end(self):
@@ -217,6 +225,8 @@ class ChatBot:
         if (not self.joined and self.channel in text):
             self.joined = True
             self.timer = datetime.datetime.now().timestamp()
+            self.recv_history = []
+            self.sent_history = []
                     
 
         # respond to user, if we were prompted by specific user input
@@ -225,6 +235,11 @@ class ChatBot:
             # store time of last message.
             self.timer = datetime.datetime.now().timestamp()
             self.respond_command(text)
+
+        # from here on out, check for certain packet ID's
+        if PacketID.NAME_REPLY in text:
+            text = text.split(':')[2]
+            self.send_message(self.nick, "Here's all of them: " + str(text))
 
 
     def respond_command(self, text):
@@ -235,7 +250,7 @@ class ChatBot:
         text = text.split(':', 3)
         user = text[1].split('!')[0]
         recv_msg = text[3].lstrip(" ").rstrip("\r\n").lower()
-        self.recv_history.append(recv_msg)
+        # self.recv_history.append(recv_msg)
 
         # 3 builtins: forget, die, name all
         # these won't use self.send_message because we don't actually want to log these
@@ -246,9 +261,12 @@ class ChatBot:
             self.kill_client()
             return
 
+        # if we had a lot of commands, we'd take care of them here
         elif "name all" == recv_msg:
-            all_names = self.irc.name_all(self.channel)
-            self.irc.send(self.channel, user, "Here's all of them: " + str(all_names))
+            # send names query
+            self.send_name_all(user, recv_msg)
+            # will be handled downstream by handle_packet
+            
 
         else:
             self.respond(user, recv_msg)
@@ -275,7 +293,7 @@ class ChatBot:
                 # if we got a packet, dequeue it
                 if not self.packet_queue.empty():
                     text = self.packet_queue.get()
-
+                    # print(text)
                     # now we need to handle certain events once we see certain packets
                     self.handle_packet(text)
 

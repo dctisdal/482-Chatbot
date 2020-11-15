@@ -26,9 +26,12 @@ class IRC:
         self.irc.send(bytes("JOIN " + channel + "\n", "UTF-8"))
 
     # Receive one packet
+    # really, we should write an interface that inherits many packet types
     def get_response(self):
+        
         resp = self.irc.recv(2040).decode("UTF-8")
         print(resp)
+
 
         # If server pinged us, respond with pong
         if resp.find('PING') != -1:
@@ -44,8 +47,7 @@ class IRC:
         self.irc.close()
         return
 
+    # send names packet
     def name_all(self, channel):
         self.irc.send(bytes("NAMES " + channel + "\n", "UTF-8"))
-        # time.sleep(1)
-        resp = self.irc.recv(353).decode("UTF-8")
-        return resp.split(':')[:2]
+
