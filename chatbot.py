@@ -36,15 +36,15 @@ class ChatBot:
         self.timeout = timeout
         self.joined = False
         self.running = False
+        self.wants_answer = None
         self.packet_queue = queue.Queue()
-        self.wants_answer = False
 
         # Connect to server
         self.irc = IRC()
         self.connect(server, channel, nick)
 
-        # Start a thread to listen for packets
-        self.packet_thread = threading.Thread(target = self.receive_packet)
+        # Start a daemon thread to listen for packets
+        self.packet_thread = threading.Thread(target = self.receive_packet, daemon = True)
         
 
     def connect(self, server, channel, nick):
@@ -54,31 +54,51 @@ class ChatBot:
         if self.state == State.START:
             # We got an outreach from our starting state.
             # We're speaking SECOND.
+            self.wants_answer = False
             self.outreach_reply()
+
         elif self.state == State.SENT_OUTREACH or self.state == State.SENT_OUTREACH_TWICE:
             # We sent an outreach, and got a reply back.
             # We're speaking FIRST.
+            # handled by the timeout function
             self.inquiry()
+
         elif self.state == State.SENT_INQUIRY:
-            self.inquiry_reply()
+            # bot sent inquiry, we responded, we inquired
+            print(self.wants_answer)
+            if self.wants_answer == False:
+                self.inquiry_reply()
+            else:
+                self.wants_answer = False
+
         elif self.state == State.SENT_OUTREACH_REPLY:
+            # bot will reply, then inquire
             self.inquiry_reinquiry()
+
         elif self.state == State.SENT_INQUIRY_REPLY:
             self.end()
 
     def forget(self, user):
+
         self.sent_history = []
         self.recv_history = []
+        self.wants_answer = None
         self.state = State.START
         self.irc.send(self.channel, user, "Forget what? And who are you?")
 
     def send_message(self, user, msg):
+
         self.irc.send(self.channel, user, msg)
         self.sent_history.append(msg)
 
     def end(self):
-        time.sleep(1)
-        self.history = []
+        """
+        After we hit end, we force bot to start again.
+        Set bot states to default.
+        """
+        # self.sent_history = []
+        # self.recv_history = []
+        self.wants_answer = None
         self.state = State.START
 
     def giveup(self):
@@ -89,7 +109,6 @@ class ChatBot:
             "I guess it wasn't important."
         ]
         self.send_message(self.nick, random.choice(responses))
-        #self.irc.send(self.channel, None, random.choice(responses))
         self.end()
 
     def initial_outreach(self):
@@ -118,145 +137,163 @@ class ChatBot:
         self.state = State.SENT_OUTREACH_TWICE
 
     def outreach_reply(self):
-        # SPEAKING SECOND.
+        # as the bot, we speak second
         # Reach this from State START
-        response = "outreach reply (You spoke first)"
-        #self.irc.send(self.channel, None, response)
-        # this None needs to get changed... (AND THE ONES BELOW)
-        self.send_message(self.nick, response)
+        response = ["bot responding to ur outreach"]
+        self.send_message(self.nick, random.choice(response))
         self.state = State.SENT_OUTREACH_REPLY
 
     def inquiry(self):
-        response = "inquiry (You spoke second)"
-        #self.irc.send(self.channel, None, response)
-        self.send_message(self.nick, response)
+        response = ["bot asking us a question"]
+        self.send_message(self.nick, random.choice(response))
         self.state = State.SENT_INQUIRY
 
     def inquiry_reply(self):
-        response = "inquiry reply (You spoke second)"
-        #self.irc.send(self.channel, None, response)
-        self.send_message(self.nick, response)
+        response = ["bot responding to our inquiry"]
+        self.send_message(self.nick, random.choice(response))
         self.end()
 
     def inquiry_reinquiry(self):
-        response = "inquiry reply + inquiry (You spoke first)"
-        #self.irc.send(self.channel, None, response)
-        self.send_message(self.nick, response)
+        replies = ['bot reply to my inquiry']
+        inquiries = ['bot asking us a question']
+        self.send_message(self.nick, random.choice(replies))
+        self.send_message(self.nick, random.choice(inquiries))
         self.state = State.SENT_INQUIRY_REPLY
 
     def handle_timeout(self):
-        # if you stayed slient for `timeout` amount of time
+        """
+        This function handles state transitions after timeouts.
+        """
+
+        # bot becomes first speaker here
         if self.state == State.START:
             self.initial_outreach()
             self.timer = datetime.datetime.now().timestamp()
+            # awaits one answer in inquiry reply
+            self.wants_answer = True
 
-
+        # if bot already sent an outreach
         elif self.state == State.SENT_OUTREACH:
             self.secondary_outreach()
             self.timer = datetime.datetime.now().timestamp()
 
         # giveups
+        # note that our bot can be either 1 or 2. this handles both cases
         elif (
-            self.state == State.SENT_OUTREACH_TWICE or
-            self.state == State.SENT_OUTREACH_REPLY or
-            self.state == State.SENT_REPLY
+            self.state == State.SENT_OUTREACH_TWICE or  # bot pinged us twice
+            self.state == State.SENT_OUTREACH_REPLY or  # bot responded to our first msg
+            self.state == State.SENT_INQUIRY        or  # bot, as speaker 1, asked us a question
+            self.state == State.SENT_INQUIRY_REPLY      # bot, as speaker 2, asked us a question
         ):
             self.giveup()
             self.timer = datetime.datetime.now().timestamp()
             
 
     def receive_packet(self):
-        
-        # continously receive packets
+        """
+        This function is meant to be called as a thread to recieve packets.
+        Necessary because if we try receiving in the main client loop, it hangs as IRC 
+        only sends packets upon new text, ping, or file
+        """
         while self.running:
-            print('getting response from irc')
             self.packet_queue.put(self.irc.get_response())
 
     def kill_client(self):
+        """
+        Kill the client and close the socket.
+        """
 
         self.running = False
-
-        self.send_message(self.nick, "So long and thanks for all the phish...")
-
-        # kill packet listening thread
-        self.packet_thread.join()
-
-        # kill socket
+        #self.send_message(self.nick, "So long and thanks for all the phish...")
+        self.irc.send(self.channel, self.nick, "So long and thanks for all the phish...")
         self.irc.die(self.channel)
 
+    def handle_packet(self, text):
+        """
+        Upon receiving a text packet, this function handles how to respond.
+        """
 
-    # abstraction of running client.
-    # at this point, we already connected.
+        # bot realizes it has joined
+        if (not self.joined and self.channel in text):
+            self.joined = True
+            self.timer = datetime.datetime.now().timestamp()
+                    
+
+        # respond to user, if we were prompted by specific user input
+        if text is not None and self.nick + ":" in text and self.channel in text:
+
+            # store time of last message.
+            self.timer = datetime.datetime.now().timestamp()
+            self.respond_command(text)
+
+
+    def respond_command(self, text):
+        """
+        Responds to user commands.
+        """
+
+        text = text.split(':', 3)
+        user = text[1].split('!')[0]
+        recv_msg = text[3].lstrip(" ").rstrip("\r\n").lower()
+        self.recv_history.append(recv_msg)
+
+        # 3 builtins: forget, die, name all
+        # these won't use self.send_message because we don't actually want to log these
+        if "forget" == recv_msg:
+            self.forget(user)
+
+        elif "die" == recv_msg:
+            self.kill_client()
+            return
+
+        elif "name all" == recv_msg:
+            all_names = self.irc.name_all(self.channel)
+            self.irc.send(self.channel, user, "Here's all of them: " + str(all_names))
+
+        else:
+            self.respond(user, recv_msg)
+
     def run(self):
+        """
+        Abstraction of running client.
+        The client already connected to IRC before this.
+        """
 
         self.running = True
         self.history = []
 
         # receive packets in a separate thread
-        print('beginning to receive packets')
         self.packet_thread.start()
 
-        # lower abstraction of client running
         while self.running:
-
-            # handle timeout outside packet receiver
+            
             try:
-                if 1 <= int(datetime.datetime.now().timestamp() - self.timer) <= 1.01:
-                    print(datetime.datetime.now().timestamp() - self.timer)
-
+                # handle timeout
                 if datetime.datetime.now().timestamp() - self.timer > self.timeout:
                     self.handle_timeout()
 
                 # if we got a packet, dequeue it
                 if not self.packet_queue.empty():
                     text = self.packet_queue.get()
-                    print("dequeued a packet", text)
 
+                    # now we need to handle certain events once we see certain packets
+                    self.handle_packet(text)
 
-                    # now we need to handle all the packet cases.
+                # Sleeping is fine since packets received are handled by a daemon
+                # the client doesn't need to poll for packets
+                time.sleep(0.005)
 
-                    # bot realizes it has joined
-                    if (not self.joined and self.channel in text):
-                        self.joined = True
-                        self.timer = datetime.datetime.now().timestamp()
-                        print("We have joined the channel. Time is", self.timer)
-                    
-
-                    # respond to user, if we were prompted by something.
-                    if text is not None and self.nick + ":" in text and self.channel in text:
-                        print(self.state)
-
-                        # store time of last message.
-                        self.timer = datetime.datetime.now().timestamp()
-
-                        text = text.split(':', 3)
-                        user = text[1].split('!')[0]
-                        recv_msg = text[3].lstrip(" ").rstrip("\r\n")
-                        self.recv_history.append(recv_msg)
-                        print("Received:", recv_msg)
-
-                        # 3 builtins: forget, die, name all
-                        # these won't use self.send_message because we don't actually want to log these
-                        if "forget" == recv_msg:
-                            self.forget(user)
-
-                        elif "die" == recv_msg:
-                            self.kill_client()
-
-                        elif "name all" == recv_msg:
-                            all = self.irc.name_all(self.channel)
-                            self.irc.send(self.channel, user, "Here's all of them: " + str(all))
-
-                        else:
-                            self.respond(user, recv_msg)
+                # if this was a game, this is where the GUI calls would be
 
             except KeyboardInterrupt:
+                print("Received KeyboardInterrupt. Shutting down...")
                 self.kill_client()
+                return
 
-            time.sleep(0.0005)
+            
 
 def main():
-    bot = ChatBot(timeout=5)
+    bot = ChatBot(timeout=10)
     bot.run()
     pass
 
