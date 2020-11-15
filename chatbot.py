@@ -5,11 +5,12 @@ import datetime
 from nltk import word_tokenize
 
 class State:
-    START               = 1
-    SENT_OUTREACH       = 2
-    SENT_OUTREACH_TWICE = 3
+    START               = 1 # if we get a message here, we're speaking second
+    SENT_OUTREACH       = 2 # if we get a message here, we're speaking first
+    SENT_OUTREACH_TWICE = 3 #                  or here
     SENT_OUTREACH_REPLY = 4
-    SENT_REPLY          = 5
+    SENT_INQUIRY        = 5
+    SENT_INQUIRY_REPLY  = 6
 
 def time_of_day():
     hour = datetime.datetime.now().time().hour
@@ -21,11 +22,11 @@ def time_of_day():
         return "evening"
 
 class ChatBot:
-    def __init__(self, server="irc.freenode.net", channel="#CPE482A", nick="spicy-bot", timeout=5):
+    def __init__(self, server="irc.freenode.net", channel="#CPE482A", nick="spicy-bot", timeout=30):
         self.nick = nick
         self.channel = channel
         self.server = server
-        state = State.START
+        self.state = State.START
         self.history = []
         self.wants_answer = False
         self.irc = IRC(timeout=timeout)
@@ -39,17 +40,21 @@ class ChatBot:
             # We got an outreach from our starting state.
             # We're speaking SECOND.
             self.outreach_reply()
-        elif self.state == State.SENT_OUTREACH or state == State.SENT_OUTREACH_TWICE:
+        elif self.state == State.SENT_OUTREACH or self.state == State.SENT_OUTREACH_TWICE:
             # We sent an outreach, and got a reply back.
             # We're speaking FIRST.
-            self.first_reply()
-        elif self.state == State.SENT_REPLY:
-            self.second_reply()
+            self.inquiry()
+        elif self.state == State.SENT_INQUIRY:
+            self.inquiry_reply()
+        elif self.state == State.SENT_OUTREACH_REPLY:
+            self.inquiry_reinquiry()
+        elif self.state == State.SENT_INQUIRY_REPLY:
+            self.end()
 
     def end(self):
-        time.sleep(5)
+        time.sleep(1)
         self.history = []
-        state = State.START
+        self.state = State.START
 
     def giveup(self):
         responses = [
@@ -58,7 +63,6 @@ class ChatBot:
             "Whatever.",
             "I guess it wasn't important."
         ]
-
         self.irc.send(self.channel, None, random.choice(responses))
         self.end()
 
@@ -70,8 +74,9 @@ class ChatBot:
             "Good " + time_of_day() + ".",
             "Good " + time_of_day() + "!"
         ]
-        self.irc.send(self.channel, None, random.choice(responses))
-        state = State.SENT_OUTREACH
+        response = random.choice(responses)
+        self.irc.send(self.channel, None, response)
+        self.state = State.SENT_OUTREACH
 
     def secondary_outreach(self):
         # > Hello!
@@ -80,32 +85,42 @@ class ChatBot:
             "Are you still there?",
             "Is anyone out theeere?"
         ]
-        self.irc.send(self.channel, None, random.choice(responses))
-        state = State.SENT_OUTREACH_TWICE
+        response = random.choice(responses)
+        self.irc.send(self.channel, None, response)
+        self.state = State.SENT_OUTREACH_TWICE
 
     def outreach_reply(self):
         # SPEAKING SECOND.
         # Reach this from State START
-        state = State.SENT_OUTREACH_REPLY
+        response = "outreach reply (You spoke first)"
+        self.irc.send(self.channel, None, response)
+        self.state = State.SENT_OUTREACH_REPLY
 
-    def first_reply(self):
+    def inquiry(self):
+        response = "inquiry (You spoke second)"
+        self.irc.send(self.channel, None, response)
+        self.state = State.SENT_INQUIRY
 
-        state = State.SENT_REPLY
-
-    def second_reply(self):
-
+    def inquiry_reply(self):
+        response = "inquiry reply (You spoke second)"
+        self.irc.send(self.channel, None, response)
         self.end()
 
+    def inquiry_reinquiry(self):
+        response = "inquiry reply + inquiry (You spoke first)"
+        self.irc.send(self.channel, None, response)
+        self.state = State.SENT_INQUIRY_REPLY
+
     def handle_timeout(self):
-        if state == State.START:
+        if self.state == State.START:
             self.initial_outreach()
-        elif state == State.SENT_OUTREACH:
+        elif self.state == State.SENT_OUTREACH:
             self.secondary_outreach()
         # giveups
         elif (
-            state == State.SENT_OUTREACH_TWICE or
-            state == State.SENT_OUTREACH_REPLY or
-            state == State.SENT_REPLY
+            self.state == State.SENT_OUTREACH_TWICE or
+            self.state == State.SENT_OUTREACH_REPLY or
+            self.state == State.SENT_REPLY
         ):
             self.giveup()
             
@@ -145,11 +160,9 @@ class ChatBot:
                     self.respond(user, recv_msg)
 
 def main():
-    #bot = ChatBot()
-    #bot.run()
+    bot = ChatBot(timeout=8)
+    bot.run()
     pass
-
-
 
 if __name__ == "__main__":
     main()
