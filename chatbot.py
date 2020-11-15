@@ -4,18 +4,12 @@ import random
 import datetime
 from nltk import word_tokenize
 
-class Phase:
-    START                = 1
-    INITIAL_OUTREACH_1   = 2
-    SECONDARY_OUTREACH_1 = 3
-    GIVEUP_FRUSTRATED    = 4
-    INQUIRY_1            = 5
-    INQUIRY_REPLY_1      = 6
-    OUTREACH_REPLY_2     = 7
-    INQUIRY_2            = 8
-    INQUIRY_REPLY_2      = 10
-    END                  = 11
-
+class State:
+    START               = 1
+    SENT_OUTREACH       = 2
+    SENT_OUTREACH_TWICE = 3
+    SENT_OUTREACH_REPLY = 4
+    SENT_REPLY          = 5
 
 def time_of_day():
     hour = datetime.datetime.now().time().hour
@@ -26,14 +20,14 @@ def time_of_day():
     else:
         return "evening"
 
-
 class ChatBot:
-    def __init__(self, server="irc.freenode.net", channel="#CPE482", nick="spicy-bot", timeout=5):
+    def __init__(self, server="irc.freenode.net", channel="#CPE482A", nick="spicy-bot", timeout=5):
         self.nick = nick
         self.channel = channel
         self.server = server
-        self.phase = Phase.START
-        self.all_msg = []
+        state = State.START
+        self.history = []
+        self.wants_answer = False
         self.irc = IRC(timeout=timeout)
         self.connect(server, channel, nick)
 
@@ -41,12 +35,21 @@ class ChatBot:
         self.irc.connect(server, channel, nick)
 
     def respond(self, user, recv_msg):
-        if "hello" in recv_msg:
-            self.irc.send(self.channel, user, "Hello right back at you " + user)
+        if self.state == State.START:
+            # We got an outreach from our starting state.
+            # We're speaking SECOND.
+            self.outreach_reply()
+        elif self.state == State.SENT_OUTREACH or state == State.SENT_OUTREACH_TWICE:
+            # We sent an outreach, and got a reply back.
+            # We're speaking FIRST.
+            self.first_reply()
+        elif self.state == State.SENT_REPLY:
+            self.second_reply()
 
     def end(self):
         time.sleep(5)
-        self.phase = Phase.START
+        self.history = []
+        state = State.START
 
     def giveup(self):
         responses = [
@@ -57,7 +60,6 @@ class ChatBot:
         ]
 
         self.irc.send(self.channel, None, random.choice(responses))
-        self.phase = Phase.END
         self.end()
 
     def initial_outreach(self):
@@ -69,22 +71,42 @@ class ChatBot:
             "Good " + time_of_day() + "!"
         ]
         self.irc.send(self.channel, None, random.choice(responses))
+        state = State.SENT_OUTREACH
 
+    def secondary_outreach(self):
+        # > Hello!
+        # > Is anyone there?
+        responses = [
+            "Are you still there?",
+            "Is anyone out theeere?"
+        ]
+        self.irc.send(self.channel, None, random.choice(responses))
+        state = State.SENT_OUTREACH_TWICE
+
+    def outreach_reply(self):
+        # SPEAKING SECOND.
+        # Reach this from State START
+        state = State.SENT_OUTREACH_REPLY
+
+    def first_reply(self):
+
+        state = State.SENT_REPLY
+
+    def second_reply(self):
+
+        self.end()
 
     def handle_timeout(self):
-        if self.phase == Phase.START:
-            #self.phase = Phase.INITIAL_OUTREACH_1
+        if state == State.START:
             self.initial_outreach()
-        elif self.phase == Phase.INITIAL_OUTREACH_1:
-            self.phase = Phase.SECONDARY_OUTREACH_1
+        elif state == State.SENT_OUTREACH:
+            self.secondary_outreach()
         # giveups
         elif (
-            self.phase == Phase.SECONDARY_OUTREACH_1 or
-            self.phase == Phase.OUTREACH_REPLY_2 or
-            self.phase == Phase.INQUIRY_1 or
-            self.phase == Phase.INQUIRY_2
+            state == State.SENT_OUTREACH_TWICE or
+            state == State.SENT_OUTREACH_REPLY or
+            state == State.SENT_REPLY
         ):
-            self.phase = Phase.GIVEUP_FRUSTRATED
             self.giveup()
             
 
@@ -95,7 +117,7 @@ class ChatBot:
             self.handle_timeout()
 
     def run(self):
-        self.all_msg = []
+        self.history = []
         while True:
             text = self.get_response_timeout()
 
@@ -104,13 +126,13 @@ class ChatBot:
                 text = text.split(':', 3)
                 user = text[1].split('!')[0]
                 recv_msg = text[3].lstrip(" ").rstrip("\r\n")
-                self.all_msg.append(word_tokenize(recv_msg))
+                self.history.append(word_tokenize(recv_msg))
                 print(recv_msg)
 
                 # 3 builtins: forget, die, name all
                 if "forget" == recv_msg:
                     responses = []
-                    self.all_msg = []
+                    self.history = []
                     self.irc.send(self.channel, user, "Forget what? And who are you?")
                 elif "die" == recv_msg:
                     self.irc.send(self.channel, user, "So long and thanks for all the phish...")
@@ -123,8 +145,8 @@ class ChatBot:
                     self.respond(user, recv_msg)
 
 def main():
-    bot = ChatBot()
-    bot.run()
+    #bot = ChatBot()
+    #bot.run()
     pass
 
 
