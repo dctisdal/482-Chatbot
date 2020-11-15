@@ -1,7 +1,10 @@
-from irc import *
 import os
+import queue
 import random
 import datetime
+import threading
+
+from irc import *
 from nltk import word_tokenize
 
 class State:
@@ -29,9 +32,20 @@ class ChatBot:
         self.state = State.START
         self.sent_history = []
         self.recv_history = []
+        self.timer = 10000000000000 #
+        self.timeout = timeout
+        self.joined = False
+        self.running = False
+        self.packet_queue = queue.Queue()
         self.wants_answer = False
-        self.irc = IRC(timeout=timeout)
+
+        # Connect to server
+        self.irc = IRC()
         self.connect(server, channel, nick)
+
+        # Start a thread to listen for packets
+        self.packet_thread = threading.Thread(target = self.receive_packet)
+        
 
     def connect(self, server, channel, nick):
         self.irc.connect(server, channel, nick)
@@ -74,7 +88,8 @@ class ChatBot:
             "Whatever.",
             "I guess it wasn't important."
         ]
-        self.irc.send(self.channel, None, random.choice(responses))
+        self.send_message(self.nick, random.choice(responses))
+        #self.irc.send(self.channel, None, random.choice(responses))
         self.end()
 
     def initial_outreach(self):
@@ -87,7 +102,7 @@ class ChatBot:
         ]
         response = random.choice(responses)
         #self.irc.send(self.channel, None, response)
-        self.send_message(None, response)
+        self.send_message(self.nick, response)
         self.state = State.SENT_OUTREACH
 
     def secondary_outreach(self):
@@ -99,7 +114,7 @@ class ChatBot:
         ]
         response = random.choice(responses)
         #self.irc.send(self.channel, None, response)
-        self.send_message(None, response)
+        self.send_message(self.nick, response)
         self.state = State.SENT_OUTREACH_TWICE
 
     def outreach_reply(self):
@@ -108,32 +123,38 @@ class ChatBot:
         response = "outreach reply (You spoke first)"
         #self.irc.send(self.channel, None, response)
         # this None needs to get changed... (AND THE ONES BELOW)
-        self.send_message(None, response)
+        self.send_message(self.nick, response)
         self.state = State.SENT_OUTREACH_REPLY
 
     def inquiry(self):
         response = "inquiry (You spoke second)"
         #self.irc.send(self.channel, None, response)
-        self.send_message(None, response)
+        self.send_message(self.nick, response)
         self.state = State.SENT_INQUIRY
 
     def inquiry_reply(self):
         response = "inquiry reply (You spoke second)"
         #self.irc.send(self.channel, None, response)
-        self.send_message(None, response)
+        self.send_message(self.nick, response)
         self.end()
 
     def inquiry_reinquiry(self):
         response = "inquiry reply + inquiry (You spoke first)"
         #self.irc.send(self.channel, None, response)
-        self.send_message(None, response)
+        self.send_message(self.nick, response)
         self.state = State.SENT_INQUIRY_REPLY
 
     def handle_timeout(self):
+        # if you stayed slient for `timeout` amount of time
         if self.state == State.START:
             self.initial_outreach()
+            self.timer = datetime.datetime.now().timestamp()
+
+
         elif self.state == State.SENT_OUTREACH:
             self.secondary_outreach()
+            self.timer = datetime.datetime.now().timestamp()
+
         # giveups
         elif (
             self.state == State.SENT_OUTREACH_TWICE or
@@ -141,43 +162,101 @@ class ChatBot:
             self.state == State.SENT_REPLY
         ):
             self.giveup()
+            self.timer = datetime.datetime.now().timestamp()
             
 
-    def get_response_timeout(self):
-        try:
-            return self.irc.get_response()
-        except socket.timeout:
-            self.handle_timeout()
+    def receive_packet(self):
+        
+        # continously receive packets
+        while self.running:
+            print('getting response from irc')
+            self.packet_queue.put(self.irc.get_response())
 
+    def kill_client(self):
+
+        self.running = False
+
+        self.send_message(self.nick, "So long and thanks for all the phish...")
+
+        # kill packet listening thread
+        self.packet_thread.join()
+
+        # kill socket
+        self.irc.die(self.channel)
+
+
+    # abstraction of running client.
+    # at this point, we already connected.
     def run(self):
+
+        self.running = True
         self.history = []
-        while True:
-            text = self.get_response_timeout()
 
-            # respond to user, if we were prompted by something.
-            if text is not None and self.nick + ":" in text and self.channel in text:
-                text = text.split(':', 3)
-                user = text[1].split('!')[0]
-                recv_msg = text[3].lstrip(" ").rstrip("\r\n")
-                self.recv_history.append(recv_msg)
-                print("Received:", recv_msg)
+        # receive packets in a separate thread
+        print('beginning to receive packets')
+        self.packet_thread.start()
 
-                # 3 builtins: forget, die, name all
-                # these won't use self.send_message because we don't actually want to log these
-                if "forget" == recv_msg:
-                    self.forget(user)
-                elif "die" == recv_msg:
-                    self.irc.send(self.channel, user, "So long and thanks for all the phish...")
-                    self.irc.die(self.channel)
-                    return
-                elif "name all" == recv_msg:
-                    all = self.irc.name_all(self.channel)
-                    self.irc.send(self.channel, user, "Here's all of them: " + str(all))
-                else:
-                    self.respond(user, recv_msg)
+        # lower abstraction of client running
+        while self.running:
+
+            # handle timeout outside packet receiver
+            try:
+                if 1 <= int(datetime.datetime.now().timestamp() - self.timer) <= 1.01:
+                    print(datetime.datetime.now().timestamp() - self.timer)
+
+                if datetime.datetime.now().timestamp() - self.timer > self.timeout:
+                    self.handle_timeout()
+
+                # if we got a packet, dequeue it
+                if not self.packet_queue.empty():
+                    text = self.packet_queue.get()
+                    print("dequeued a packet", text)
+
+
+                    # now we need to handle all the packet cases.
+
+                    # bot realizes it has joined
+                    if (not self.joined and self.channel in text):
+                        self.joined = True
+                        self.timer = datetime.datetime.now().timestamp()
+                        print("We have joined the channel. Time is", self.timer)
+                    
+
+                    # respond to user, if we were prompted by something.
+                    if text is not None and self.nick + ":" in text and self.channel in text:
+                        print(self.state)
+
+                        # store time of last message.
+                        self.timer = datetime.datetime.now().timestamp()
+
+                        text = text.split(':', 3)
+                        user = text[1].split('!')[0]
+                        recv_msg = text[3].lstrip(" ").rstrip("\r\n")
+                        self.recv_history.append(recv_msg)
+                        print("Received:", recv_msg)
+
+                        # 3 builtins: forget, die, name all
+                        # these won't use self.send_message because we don't actually want to log these
+                        if "forget" == recv_msg:
+                            self.forget(user)
+
+                        elif "die" == recv_msg:
+                            self.kill_client()
+
+                        elif "name all" == recv_msg:
+                            all = self.irc.name_all(self.channel)
+                            self.irc.send(self.channel, user, "Here's all of them: " + str(all))
+
+                        else:
+                            self.respond(user, recv_msg)
+
+            except KeyboardInterrupt:
+                self.kill_client()
+
+            time.sleep(0.0005)
 
 def main():
-    bot = ChatBot(timeout=8)
+    bot = ChatBot(timeout=5)
     bot.run()
     pass
 

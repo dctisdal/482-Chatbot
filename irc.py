@@ -18,17 +18,17 @@ class IRC:
         # Connect to the server
         print("Connecting to: " + server)
         self.irc.connect((server, 6667))
-
+        print("perform user auth")
         # Perform user authentication
         self.irc.send(bytes("USER " + botnick + " " + botnick + " " + botnick + " :This is a fun bot!\n", "UTF-8"))  # user authentication
         self.irc.send(bytes("NICK " + botnick + "\n", "UTF-8"))
-        time.sleep(5)
-
+        # time.sleep(5)
+        print("join c")
         # join the channel
         self.irc.send(bytes("JOIN " + channel + "\n", "UTF-8"))
 
     def get_response(self):
-        time.sleep(1)
+        # time.sleep(1)
         # Get the response
         resp = self.irc.recv(2040).decode("UTF-8")
         print(resp)
@@ -37,12 +37,14 @@ class IRC:
             self.irc.send(bytes('PONG ' + resp.split()[1] + '\r\n', "UTF-8"))
         return resp
 
+    # send quit and close the socket
     def die(self, channel):
         self.irc.send(bytes("QUIT " + channel + "\n", "UTF-8"))
+        self.irc.close()
         return
 
     def name_all(self, channel):
         self.irc.send(bytes("NAMES " + channel + "\n", "UTF-8"))
-        time.sleep(1)
+        # time.sleep(1)
         resp = self.irc.recv(353).decode("UTF-8")
         return resp.split(':')[2]
