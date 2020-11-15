@@ -28,10 +28,9 @@ class IRC:
     # Receive one packet
     # really, we should write an interface that inherits many packet types
     def get_response(self):
-        
+
         resp = self.irc.recv(2040).decode("UTF-8")
         print(resp)
-
 
         # If server pinged us, respond with pong
         if resp.find('PING') != -1:

@@ -1,9 +1,11 @@
 import os
+import json
 import queue
 import random
 import datetime
 import threading
 
+from nlp import *
 from irc import *
 from nltk import word_tokenize
 
@@ -37,9 +39,11 @@ class ChatBot:
         self.recv_history = []
         self.timer = 10000000000000 #
         self.timeout = timeout
+        self.cooldown = 2
         self.joined = False
         self.running = False
         self.wants_answer = None
+        
         self.packet_queue = queue.Queue()
 
         # Connect to server
@@ -48,6 +52,9 @@ class ChatBot:
 
         # Start a daemon thread to listen for packets
         self.packet_thread = threading.Thread(target = self.receive_packet, daemon = True)
+
+        sents = json.load(open("sentiments.json", 'r'))
+        self.sentiments = {x: set(sents[x]) for x in sents}
         
 
     def connect(self, server, channel, nick):
@@ -91,11 +98,6 @@ class ChatBot:
     def send_message(self, user, msg):
 
         self.irc.send(self.channel, user, msg)
-        self.sent_history.append(msg)
-
-    def send_name_all(self, user, msg):
-
-        self.irc.name_all(self.channel)
         self.sent_history.append(msg)
 
     def end(self):
@@ -146,23 +148,27 @@ class ChatBot:
     def outreach_reply(self):
         # as the bot, we speak second
         # Reach this from State START
-        response = ["bot responding to ur outreach"]
+        response = ['Hi!', "Howdy!", "Greetings.", "Hello!"]
+        if time_of_day() == 'morning':
+            response.append("Top of the morning to ya!")
         self.send_message(self.nick, random.choice(response))
         self.state = State.SENT_OUTREACH_REPLY
 
     def inquiry(self):
-        response = ["bot asking us a question"]
+        response = ["How are you doing?",
+                    "How is everything?",
+                    "How is your day going?"]
         self.send_message(self.nick, random.choice(response))
         self.state = State.SENT_INQUIRY
 
     def inquiry_reply(self):
-        response = ["bot responding to our inquiry"]
-        self.send_message(self.nick, random.choice(response))
+        response = inquiry_reply_parser(self.recv_history[-1] + " " + self.recv_history[-2], self.sentiments)
+        self.send_message(self.nick, response)
         self.end()
 
     def inquiry_reinquiry(self):
-        replies = ['bot reply to my inquiry']
-        inquiries = ['bot asking us a question']
+        replies = ['Not bad at all.', "Pretty good.", "Life could be better."]
+        inquiries = ['How about you?', "How about yourself?"]
         self.send_message(self.nick, random.choice(replies))
         self.send_message(self.nick, random.choice(inquiries))
         self.state = State.SENT_INQUIRY_REPLY
@@ -238,8 +244,8 @@ class ChatBot:
         # respond to user, if we were prompted by specific user input
         if text is not None and self.nick + ":" in text and self.channel in text:
 
-            # if there hasn't been 3 seconds before last msg, ignore
-            if datetime.datetime.now().timestamp() - self.timer < 2:
+            # if there hasn't been 2 seconds before last msg, ignore
+            if datetime.datetime.now().timestamp() - self.timer < self.cooldown:
                 self.send_message(self.nick, "Give me a moment. I need 2 seconds to collect my thoughts.")
             else:
                 # store time of last message.
@@ -254,21 +260,19 @@ class ChatBot:
         text = text.split(':', 3)
         user = text[1].split('!')[0]
         recv_msg = text[3].lstrip(" ").rstrip("\r\n").lower()
-        # self.recv_history.append(recv_msg)
+        self.recv_history.append(recv_msg)
 
         # 3 builtins: forget, die, name all
         # these won't use self.send_message because we don't actually want to log these
         if "forget" == recv_msg:
             self.forget(user)
-
         elif "die" == recv_msg:
             self.kill_client()
             return
-
         # if we had a lot of commands, we'd take care of them here
         elif "name all" == recv_msg:
             # send names query
-            self.send_name_all(user, recv_msg)
+            self.irc.name_all(self.channel)
             # will be handled downstream by handle_packet
             
 
