@@ -68,7 +68,6 @@ class ChatBot:
 
         elif self.state == State.SENT_INQUIRY:
             # bot sent inquiry, we responded, we inquired
-            print(self.wants_answer)
             if self.wants_answer == False:
                 self.inquiry_reply()
             else:
@@ -212,7 +211,6 @@ class ChatBot:
         """
 
         self.running = False
-        #self.send_message(self.nick, "So long and thanks for all the phish...")
         self.irc.send(self.channel, self.nick, "So long and thanks for all the phish...")
         self.irc.die(self.channel)
 
@@ -227,26 +225,32 @@ class ChatBot:
             self.timer = datetime.datetime.now().timestamp()
             self.recv_history = []
             self.sent_history = []
-                    
+
+        # deal with certain packet ID's
+        if PacketID.NAME_REPLY in text and self.recv_history:
+            text = text.split(':')[2]
+            self.send_message(self.nick, "Here's all of them: " + str(text))
+
+        # if spec asked for other packet id's they'd go here
+
+        # from here on out, all packets are user input cases
 
         # respond to user, if we were prompted by specific user input
         if text is not None and self.nick + ":" in text and self.channel in text:
 
-            # store time of last message.
-            self.timer = datetime.datetime.now().timestamp()
-            self.respond_command(text)
-
-        # from here on out, check for certain packet ID's
-        if PacketID.NAME_REPLY in text:
-            text = text.split(':')[2]
-            self.send_message(self.nick, "Here's all of them: " + str(text))
+            # if there hasn't been 3 seconds before last msg, ignore
+            if datetime.datetime.now().timestamp() - self.timer < 2:
+                self.send_message(self.nick, "Give me a moment. I need 2 seconds to collect my thoughts.")
+            else:
+                # store time of last message.
+                self.timer = datetime.datetime.now().timestamp()
+                self.respond_command(text)
 
 
     def respond_command(self, text):
         """
         Responds to user commands.
         """
-
         text = text.split(':', 3)
         user = text[1].split('!')[0]
         recv_msg = text[3].lstrip(" ").rstrip("\r\n").lower()
@@ -276,16 +280,22 @@ class ChatBot:
         Abstraction of running client.
         The client already connected to IRC before this.
         """
-
         self.running = True
-        self.history = []
+        initiate = random.random()
 
         # receive packets in a separate thread
         self.packet_thread.start()
 
         while self.running:
-            
+
             try:
+
+                # the spec said we need to have bot initiate contact sometimes.
+                # set it to 20% of the time.
+                if initiate <= .2:
+                    self.initial_outreach()
+                    initiate = 1
+
                 # handle timeout
                 if datetime.datetime.now().timestamp() - self.timer > self.timeout:
                     self.handle_timeout()
@@ -293,13 +303,13 @@ class ChatBot:
                 # if we got a packet, dequeue it
                 if not self.packet_queue.empty():
                     text = self.packet_queue.get()
-                    # print(text)
+
                     # now we need to handle certain events once we see certain packets
                     self.handle_packet(text)
 
                 # Sleeping is fine since packets received are handled by a daemon
                 # the client doesn't need to poll for packets
-                time.sleep(0.005)
+                time.sleep(0.0001)
 
                 # if this was a game, this is where the GUI calls would be
 
@@ -307,8 +317,6 @@ class ChatBot:
                 print("Received KeyboardInterrupt. Shutting down...")
                 self.kill_client()
                 return
-
-            
 
 def main():
     bot = ChatBot(timeout=10)
