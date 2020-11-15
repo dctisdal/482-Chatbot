@@ -32,6 +32,7 @@ def time_of_day():
 class ChatBot:
     def __init__(self, server="irc.freenode.net", channel="#CPE482A", nick="spicy-bot", timeout=30):
         self.nick = nick
+        self.user = None
         self.channel = channel
         self.server = server
         self.state = State.START
@@ -65,24 +66,24 @@ class ChatBot:
             # We got an outreach from our starting state.
             # We're speaking SECOND.
             self.wants_answer = False
-            self.outreach_reply()
+            self.outreach_reply(user)
 
         elif self.state == State.SENT_OUTREACH or self.state == State.SENT_OUTREACH_TWICE:
             # We sent an outreach, and got a reply back.
             # We're speaking FIRST.
             # handled by the timeout function
-            self.inquiry()
+            self.inquiry(user)
 
         elif self.state == State.SENT_INQUIRY:
             # bot sent inquiry, we responded, we inquired
             if self.wants_answer == False:
-                self.inquiry_reply()
+                self.inquiry_reply(user)
             else:
                 self.wants_answer = False
 
         elif self.state == State.SENT_OUTREACH_REPLY:
             # bot will reply, then inquire
-            self.inquiry_reinquiry()
+            self.inquiry_reinquiry(user)
 
         elif self.state == State.SENT_INQUIRY_REPLY:
             self.end()
@@ -96,6 +97,9 @@ class ChatBot:
         self.irc.send(self.channel, user, "Forget what? And who are you?")
 
     def send_message(self, user, msg):
+        """
+        Send a packet to the IRC server.
+        """
 
         self.irc.send(self.channel, user, msg)
         self.sent_history.append(msg)
@@ -110,17 +114,17 @@ class ChatBot:
         self.wants_answer = None
         self.state = State.START
 
-    def giveup(self):
+    def giveup(self, user):
         responses = [
             "Nevermind, then.",
             "Forget it.",
             "Whatever.",
             "I guess it wasn't important."
         ]
-        self.send_message(self.nick, random.choice(responses))
+        self.send_message(user, random.choice(responses))
         self.end()
 
-    def initial_outreach(self):
+    def initial_outreach(self, user):
         responses = [
             "Hello!",
             "Hi.",
@@ -130,10 +134,10 @@ class ChatBot:
         ]
         response = random.choice(responses)
         #self.irc.send(self.channel, None, response)
-        self.send_message(self.nick, response)
+        self.send_message(user, response)
         self.state = State.SENT_OUTREACH
 
-    def secondary_outreach(self):
+    def secondary_outreach(self, user):
         # > Hello!
         # > Is anyone there?
         responses = [
@@ -142,52 +146,52 @@ class ChatBot:
         ]
         response = random.choice(responses)
         #self.irc.send(self.channel, None, response)
-        self.send_message(self.nick, response)
+        self.send_message(user, response)
         self.state = State.SENT_OUTREACH_TWICE
 
-    def outreach_reply(self):
+    def outreach_reply(self, user):
         # as the bot, we speak second
         # Reach this from State START
         response = ['Hi!', "Howdy!", "Greetings.", "Hello!"]
         if time_of_day() == 'morning':
             response.append("Top of the morning to ya!")
-        self.send_message(self.nick, random.choice(response))
+        self.send_message(user, random.choice(response))
         self.state = State.SENT_OUTREACH_REPLY
 
-    def inquiry(self):
+    def inquiry(self, user):
         response = ["How are you doing?",
                     "How is everything?",
                     "How is your day going?"]
-        self.send_message(self.nick, random.choice(response))
+        self.send_message(user, random.choice(response))
         self.state = State.SENT_INQUIRY
 
-    def inquiry_reply(self):
+    def inquiry_reply(self, user):
         response = inquiry_reply_parser(self.recv_history[-1] + " " + self.recv_history[-2], self.sentiments)
-        self.send_message(self.nick, response)
+        self.send_message(user, response)
         self.end()
 
-    def inquiry_reinquiry(self):
+    def inquiry_reinquiry(self, user):
         replies = ['Not bad at all.', "Pretty good.", "Life could be better."]
         inquiries = ['How about you?', "How about yourself?"]
-        self.send_message(self.nick, random.choice(replies))
-        self.send_message(self.nick, random.choice(inquiries))
+        self.send_message(user, random.choice(replies))
+        self.send_message(user, random.choice(inquiries))
         self.state = State.SENT_INQUIRY_REPLY
 
-    def handle_timeout(self):
+    def handle_timeout(self, user):
         """
         This function handles state transitions after timeouts.
         """
 
         # bot becomes first speaker here
         if self.state == State.START:
-            self.initial_outreach()
+            self.initial_outreach(user)
             self.timer = datetime.datetime.now().timestamp()
             # awaits one answer in inquiry reply
             self.wants_answer = True
 
         # if bot already sent an outreach
         elif self.state == State.SENT_OUTREACH:
-            self.secondary_outreach()
+            self.secondary_outreach(user)
             self.timer = datetime.datetime.now().timestamp()
 
         # giveups
@@ -198,7 +202,7 @@ class ChatBot:
             self.state == State.SENT_INQUIRY        or  # bot, as speaker 1, asked us a question
             self.state == State.SENT_INQUIRY_REPLY      # bot, as speaker 2, asked us a question
         ):
-            self.giveup()
+            self.giveup(user)
             self.timer = datetime.datetime.now().timestamp()
             
 
@@ -211,13 +215,13 @@ class ChatBot:
         while self.running:
             self.packet_queue.put(self.irc.get_response())
 
-    def kill_client(self):
+    def kill_client(self, user):
         """
         Kill the client and close the socket.
         """
 
         self.running = False
-        self.irc.send(self.channel, self.nick, "So long and thanks for all the phish...")
+        self.irc.send(self.channel, user, "So long and thanks for all the phish...")
         self.irc.die(self.channel)
 
     def handle_packet(self, text):
@@ -225,40 +229,51 @@ class ChatBot:
         Upon receiving a text packet, this function handles how to respond.
         """
 
+
+
         # bot realizes it has joined
         if (not self.joined and self.channel in text):
             self.joined = True
             self.timer = datetime.datetime.now().timestamp()
-            self.recv_history = []
-            self.sent_history = []
+            return
 
         # deal with certain packet ID's
         if PacketID.NAME_REPLY in text and self.recv_history:
             text = text.split(':')[2]
-            self.send_message(self.nick, "Here's all of them: " + str(text))
+            self.send_message(self.user, "Here's all of them: " + str(text))
+            return
+
+        # starting up, set user to a random person in the channel
+        elif PacketID.NAME_REPLY in text and not self.recv_history:
+            # remove self name
+            user = text.split(":")[2].strip().split(" ")
+            user.remove(self.nick)
+            self.user = random.choice(user)
+            return
 
         # if spec asked for other packet id's they'd go here
 
         # from here on out, all packets are user input cases
+        user = text.split(':', 3)[1].split('!')[0]
+        self.user = user
 
         # respond to user, if we were prompted by specific user input
         if text is not None and self.nick + ":" in text and self.channel in text:
 
             # if there hasn't been 2 seconds before last msg, ignore
             if datetime.datetime.now().timestamp() - self.timer < self.cooldown:
-                self.send_message(self.nick, "Give me a moment. I need 2 seconds to collect my thoughts.")
+                self.send_message(user, "Give me a moment. I need {} seconds to collect my thoughts.".format(self.cooldown))
             else:
                 # store time of last message.
                 self.timer = datetime.datetime.now().timestamp()
-                self.respond_command(text)
+                self.respond_command(user, text)
 
 
-    def respond_command(self, text):
+    def respond_command(self, user, text):
         """
         Responds to user commands.
         """
         text = text.split(':', 3)
-        user = text[1].split('!')[0]
         recv_msg = text[3].lstrip(" ").rstrip("\r\n").lower()
         self.recv_history.append(recv_msg)
 
@@ -267,14 +282,25 @@ class ChatBot:
         if "forget" == recv_msg:
             self.forget(user)
         elif "die" == recv_msg:
-            self.kill_client()
+            self.kill_client(user)
             return
         # if we had a lot of commands, we'd take care of them here
         elif "name all" == recv_msg:
             # send names query
-            self.irc.name_all(self.channel)
+            self.irc.name_all(self.channel, user)
             # will be handled downstream by handle_packet
+        elif "set timer" in recv_msg:
+            new_cooldown = -1
             
+            while True:
+                try:
+                    new_cooldown = float(recv_msg.split()[2].strip())
+                    self.send_message(user, "New time between utterances set to {} seconds.".format(new_cooldown))
+                    self.cooldown = new_cooldown
+                    break
+                except ValueError:
+                    self.send_message(user, "Valid floats only please. Usage: set timer <float>")
+                    break
 
         else:
             self.respond(user, recv_msg)
@@ -297,12 +323,13 @@ class ChatBot:
                 # the spec said we need to have bot initiate contact sometimes.
                 # set it to 20% of the time.
                 if initiate <= .2:
-                    self.initial_outreach()
+                    # pick a random user TODO
+                    self.initial_outreach(self.user)
                     initiate = 1
 
                 # handle timeout
-                if datetime.datetime.now().timestamp() - self.timer > self.timeout:
-                    self.handle_timeout()
+                if datetime.datetime.now().timestamp() - self.timer > max(self.timeout, self.cooldown):
+                    self.handle_timeout(self.user)
 
                 # if we got a packet, dequeue it
                 if not self.packet_queue.empty():
@@ -319,7 +346,7 @@ class ChatBot:
 
             except KeyboardInterrupt:
                 print("Received KeyboardInterrupt. Shutting down...")
-                self.kill_client()
+                self.kill_client(self.nick)
                 return
 
 def main():

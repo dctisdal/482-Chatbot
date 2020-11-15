@@ -47,6 +47,6 @@ class IRC:
         return
 
     # send names packet
-    def name_all(self, channel):
-        self.irc.send(bytes("NAMES " + channel + "\n", "UTF-8"))
+    def name_all(self, channel, nick):
+        self.irc.send(bytes("NAMES " + channel + " :" + nick + ": \n", "UTF-8"))
 
