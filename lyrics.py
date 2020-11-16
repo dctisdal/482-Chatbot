@@ -201,6 +201,38 @@ def title_normalizer(name):
     
     return s, len(name) - len(s)
 
+def title_normalizer_cloudflare(name):
+    """
+    changes all punctuation in a song title to match any character.
+    also changes stuff in parentheses to match any character
+    
+    returns: cleaned title
+    
+    """
+    
+    n = list(re.finditer('\(.+?\)', name, flags = re.I | re.S))
+    
+    s = ''
+    for i in range(len(name)):
+        
+        flag = False
+        # step 1: remove all the parentheses stuff, match any char
+        for possible_match in n:
+            if (possible_match.start() <= i < possible_match.end()):
+                s += '.'
+                flag = True
+                continue
+        if flag:
+            continue
+            
+        # step 2: change punct to match any character
+        if name[i] in puncts:
+            s += '.'
+        else:
+            s += name[i]
+    
+    return s
+
 def get_lyrics(text):
     text = [x.strip() for x in text.split(" by ")]
     print(text)
@@ -209,5 +241,17 @@ def get_lyrics(text):
     print("Lyric link is", lyric_link)
     print("Full title is", full_title)
     lyrics = scrape_lyrics(artists, name, lyric_link)
+    
+
+    if 'cloud_flare_always_on_short_message' in lyrics:
+        name_regex = title_normalizer_cloudflare(lyrics.split("|")[0].strip())
+        idxs = list(re.finditer(name_regex, lyrics, flags = re.I | re.S))
+        lyrics = lyrics[idxs[-1].start():]  
+
+    lyrics = lyrics.strip()
+    lyrics = re.sub("\[.+?\]", "", lyrics)
+    lyrics = re.sub("[Aa]lbum", "", lyrics)
+
     print(re.sub("\n+", "\n", lyrics.strip()))
-    return re.sub("\n+", "\n", lyrics.strip()).strip()
+
+    return re.sub("\n+", "\n", lyrics).strip()

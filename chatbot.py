@@ -86,10 +86,14 @@ class ChatBot:
 
         print(recv_msg)
 
-        lyrics = get_lyrics(" ".join(recv_msg))
+        lyrics = get_lyrics(" ".join(recv_msg)).split('\n')
         self.send_message(user, response)
-        inquiry = "Is this what you were looking for?" + '\n' + lyrics
-        self.send_message(user, inquiry)
+        #inquiry = "Is this what you were looking for?" + '\n' + lyrics
+        self.send_message("Is this what you were looking for?")
+        row = 0
+        while row < 10:
+            self.send_message(user, lyrics[row])
+            time.sleep(0.2)
         self.state = State.SENT_INQUIRY_REPLY
 
     
@@ -265,9 +269,7 @@ class ChatBot:
     def parse_name(self, recv_msg):
         intros = [
             "name is",
-            "name's",
-            "i'm",
-            "i am"
+            "name's"
         ]
         parsed = self.analyze(recv_msg)
         name = None
@@ -384,17 +386,12 @@ class ChatBot:
             "Still living life as bits, you know. The usual."
         ]
         inquiries = [
-            'How about you{}?',
-            "How about yourself{}?",
-            "How are you doing today{}?"
+            'How about you?',
+            "How about yourself?",
+            "How are you doing today?"
         ]
-
-        name = ""
-        if user in self.names.keys():
-            name = ", " + self.names[user]
-        inquiry = random.choice(inquiries).format(name)
         self.send_message(user, random.choice(replies))
-        self.send_message(user, inquiry)
+        self.send_message(user, random.choice(inquiries))
         self.state = State.SENT_INQUIRY_REPLY
 
     def handle_timeout(self, user):
