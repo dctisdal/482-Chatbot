@@ -127,32 +127,31 @@ class ChatBot:
                 for phrase, timestamp in self.recv_history[:-1]:
                     if p in phrase:
                         readable = time.ctime(timestamp)
+                        time.sleep(0.5)
                         self.send_message(user, 'I remember you said "{}" on {}'.format(p, readable))
-                        self.send_message(user, "Was this the one you were thinking of, or another time?")
                         found = True
                         break
                 if not found:
                     #time.sleep(0.5)
                     self.send_message(user, 'Sorry, but I do not have any record of you saying "{}"'.format(p))
-                    self.send_message(user, "Was there something else?")
 
             elif subject == "you":
                 for phrase, timestamp in self.sent_history:
                     if p in phrase:
                         readable = time.ctime(timestamp)
+                        time.sleep(0.5)
                         self.send_message(user, 'I remember I said "{}" on {}'.format(p, readable))
-                        self.send_message(user, "Was that what you were thinking of?")
                         found = True
                         break
                 if not found:
                     time.sleep(0.5)
                     self.send_message(user, 'Sorry, but I do not have any record of me saying "{}"'.format(p))
-                    self.send_message(user, "Was there something else?")
             else:
                 raise ValueError
         except:
             self.send_message(user, "Please use the format: time <I/you> said <phrase>")
             return
+        self.send_message(user, "Anyways, how were you doing to day?")
         self.state = State.SENT_INQUIRY_REPLY
 
     def respond(self, user, recv_msg):
@@ -407,7 +406,12 @@ class ChatBot:
         self.state = State.SENT_INQUIRY
 
     def get_loc_weather(self):
-        info = get("https://geolocation-db.com/json/{}&position=true".format(None)).json()
+        try:
+            info = get("https://geolocation-db.com/json/{}&position=true".format(None)).json()
+        except:
+            info = {}
+            info['latitude'] = 34.05
+            info['longitude'] = -118.2
         forecast = get('http://api.openweathermap.org/data/2.5/weather?lat={}&lon={}&appid=b4a2c2b82fad9f62191b9237ea6a07e7'.format(info['latitude'],
                                                                                                        info['longitude'])).json()
         weather = forecast['weather'][0]['main'].lower()
