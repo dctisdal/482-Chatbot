@@ -16,6 +16,7 @@ class State:
     SENT_OUTREACH_REPLY = 4
     SENT_INQUIRY        = 5
     SENT_INQUIRY_REPLY  = 6
+    SENT_NAME_REQUEST   = 7 # optional feature
 
 class PacketID:
     NAME_REPLY          = "353"
@@ -59,8 +60,8 @@ class ChatBot:
         # Start a daemon thread to listen for packets
         self.packet_thread = threading.Thread(target = self.receive_packet, daemon = True)
 
-        sents = json.load(open("sentiments.json", 'r'))
-        self.sentiments = {x: set(sents[x]) for x in sents}
+        #sents = json.load(open("sentiments.json", 'r'))
+        #self.sentiments = {x: set(sents[x]) for x in sents}
 
     def connect(self, server, channel, nick):
         self.irc.connect(server, channel, nick)
@@ -76,7 +77,13 @@ class ChatBot:
             # We sent an outreach, and got a reply back.
             # We're speaking FIRST.
             # handled by the timeout function
-            self.inquiry(user, recv_msg)
+            if random.randint(0, 1) == -1: # temporarily, always route to ask name...
+                self.inquiry(user, recv_msg)
+            else:
+                self.ask_name(user, recv_msg)
+        
+        elif self.state == State.SENT_NAME_REQUEST:
+            self.name_reply(user, recv_msg)
 
         elif self.state == State.SENT_INQUIRY:
             # bot sent inquiry, we responded, we inquired
@@ -214,6 +221,14 @@ class ChatBot:
 
         self.send_message(user, response)
         self.state = State.SENT_OUTREACH_REPLY
+
+    ### optional feature: name use ###
+    def ask_name(self, user, recv_msg):
+        pass
+
+    def name_reply(self, user, recv_msg):
+        pass
+    ### end optional feature part  ###
 
     def inquiry(self, user, recv_msg):
         response = ["How are you doing?",
