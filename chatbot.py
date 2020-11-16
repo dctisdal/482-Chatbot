@@ -265,7 +265,9 @@ class ChatBot:
     def parse_name(self, recv_msg):
         intros = [
             "name is",
-            "name's"
+            "name's",
+            "i'm",
+            "i am"
         ]
         parsed = self.analyze(recv_msg)
         name = None
@@ -391,7 +393,6 @@ class ChatBot:
         if user in self.names.keys():
             name = ", " + self.names[user]
         inquiry = random.choice(inquiries).format(name)
-        
         self.send_message(user, random.choice(replies))
         self.send_message(user, inquiry)
         self.state = State.SENT_INQUIRY_REPLY
