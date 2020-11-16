@@ -208,10 +208,13 @@ class ChatBot:
     def analyze(self, msg):
         # for now, we just look at the last sentence, which is most likely to be talking to the bot
         # this COULD change, though.
-        sent = sent_tokenize(msg)[-1].lower()
-        words = word_tokenize(sent)
-        sentiment = self.sa.sentiment(sent)
-        return {"sentence": sent, "words": words, "is_question": words[-1] == "?", "all_sents": sent_tokenize(msg), "sentiment": sentiment}
+        try:
+            sent = sent_tokenize(msg)[-1].lower()
+            words = word_tokenize(sent)
+            sentiment = self.sa.sentiment(sent)
+            return {"sentence": sent, "words": words, "is_question": words[-1] == "?", "all_sents": sent_tokenize(msg), "sentiment": sentiment}
+        except IndexError:
+            return None
 
     def send_message(self, user, msg):
         """
@@ -293,7 +296,7 @@ class ChatBot:
 
         parsed = self.analyze(recv_msg)
 
-        if len(respond_to.intersection(set(parsed["words"]))) == 0:
+        if parsed is None or len(respond_to.intersection(set(parsed["words"]))) == 0:
             self.send_message(user, "Not sure I understand that; maybe it's a dialect thing. Could you try again?")
             self.recv_history = self.recv_history[:-1]
             return
