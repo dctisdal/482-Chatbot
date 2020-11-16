@@ -7,6 +7,7 @@ import threading
 
 from nlp import *
 from irc import *
+from lyrics import *
 from nltk import word_tokenize, sent_tokenize
 
 class State:
@@ -66,6 +67,33 @@ class ChatBot:
     def connect(self, server, channel, nick):
         self.irc.connect(server, channel, nick)
 
+    #def respond_lyric(self, user, recv_msg):
+    #    """ responds to a user and advances the state."""
+    #    pass
+
+    def check_preposition(self, text):
+        if text in ['to', 'for']:
+            return True
+
+    def inquiry_reinquiry_lyric(self, user, recv_msg):
+        """message is like Can i get lyrics to ___ by ___"""
+        response = "Sure, I'll find those lyrics for you."
+        
+        recv_msg = recv_msg.lower().split("lyrics")[1].split()
+        # remove the preposition
+        if self.check_preposition(recv_msg[0]):
+            recv_msg = recv_msg[1:]
+
+        print(recv_msg)
+
+        lyrics = get_lyrics(" ".join(recv_msg))
+        self.send_message(user, response)
+        inquiry = "Is this what you were looking for?" + '\n' + lyrics
+        self.send_message(user, inquiry)
+        self.state = State.SENT_INQUIRY_REPLY
+
+    
+
     def respond(self, user, recv_msg):
         if self.state == State.START:
             # We got an outreach from our starting state.
@@ -100,7 +128,10 @@ class ChatBot:
 
         elif self.state == State.SENT_OUTREACH_REPLY:
             # bot will reply, then inquire
-            self.inquiry_reinquiry(user, recv_msg)
+            if "lyric" in recv_msg:
+                self.inquiry_reinquiry_lyric(user, recv_msg)
+            else:
+                self.inquiry_reinquiry(user, recv_msg)
 
         elif self.state == State.SENT_INQUIRY_REPLY:
             self.end()
