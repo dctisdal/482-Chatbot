@@ -226,6 +226,7 @@ class ChatBot:
             # Asimov, I.
             return
 
+        # if now and last time the bot sent a message is less than for example 2 sec
         if datetime.datetime.now().timestamp() - self.last_msg_time < self.cooldown:
             time.sleep(self.cooldown)
 
@@ -587,8 +588,8 @@ class ChatBot:
                     self.send_message(user, "Please don't interrupt the conversation! I'll talk to you in a second, okay?")
                     self.recv_history = self.recv_history[:-1]
                     return
-                # store time of last message.
-                self.last_msg_time = datetime.datetime.now().timestamp()
+                # store time of last message SENT BY ANYONE
+                # self.last_msg_time = datetime.datetime.now().timestamp()
                 self.respond_command(user, text)
 
 
