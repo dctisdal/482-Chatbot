@@ -103,11 +103,11 @@ class ChatBot:
             response = "Sure, I'll find those lyrics for you."
             self.send_message(user, response)
             lyrics = lyrics.split('\n')
-            self.send_message(user, "Here are the first fifteen lines. Is this what you were looking for?")
+            self.send_message(user, "Here are the first fifteen lines.")
             time.sleep(0.5)
             self.send_message(user, " | ".join(lyrics[:15]) + ".....")
             time.sleep(0.5)
-            self.send_message(user, "You can find the rest of the lyrics at {}".format("https://genius.com" + lyric_link))
+            self.send_message(user, "You can find the rest of the lyrics at {}. Is this what you were looking for?".format("https://genius.com" + lyric_link))
 
         self.state = State.SENT_INQUIRY_REPLY
 
@@ -129,22 +129,26 @@ class ChatBot:
                     if p in phrase:
                         readable = time.ctime(timestamp)
                         self.send_message(user, 'I remember you said "{}" on {}'.format(p, readable))
+                        self.send_message(user, "Was this the one you were thinking of, or another time?")
                         found = True
                         break
                 if not found:
                     #time.sleep(0.5)
                     self.send_message(user, 'Sorry, but I do not have any record of you saying "{}"'.format(p))
+                    self.send_message(user, "Was there something else?")
 
             elif subject == "you":
                 for phrase, timestamp in self.sent_history:
                     if p in phrase:
                         readable = time.ctime(timestamp)
                         self.send_message(user, 'I remember I said "{}" on {}'.format(p, readable))
+                        self.send_message(user, "Was that what you were thinking of?")
                         found = True
                         break
                 if not found:
                     time.sleep(0.5)
                     self.send_message(user, 'Sorry, but I do not have any record of me saying "{}"'.format(p))
+                    self.send_message(user, "Was there something else?")
             else:
                 raise ValueError
         except:
