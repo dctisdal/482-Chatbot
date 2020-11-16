@@ -419,7 +419,7 @@ class ChatBot:
             forecast = get('http://api.openweathermap.org/data/2.5/weather?lat={}&lon={}&appid=b4a2c2b82fad9f62191b9237ea6a07e7'.format(info['latitude'],
                                                                                                         info['longitude'])).json()
         except:
-            return info['state'], "skies existing"
+            return info['state'], "nuclear fallout"
 
         weather = forecast['weather'][0]['main'].lower()
         if weather == "thunderstorm":
