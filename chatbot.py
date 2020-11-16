@@ -413,7 +413,7 @@ class ChatBot:
             info['state'] = "Nowhere"
             info['latitude'] = 34.05
             info['longitude'] = -118.2
-        
+
         try:
             forecast = get('http://api.openweathermap.org/data/2.5/weather?lat={}&lon={}&appid=b4a2c2b82fad9f62191b9237ea6a07e7'.format(info['latitude'],
                                                                                                         info['longitude'])).json()
@@ -485,7 +485,7 @@ class ChatBot:
         replies = [
             "I kind of like {} here in {}. So not bad at all.".format(weather, loc),
             "I love {}. So great!".format(loc),
-            "Not sure I like the weather here being {}. Life could be better.".format(weather),
+            "A bit too much {} here for my tastes. Life could be better.".format(weather).rstrip('s'),
             "Still living life as bits, you know. The usual."
         ]
         inquiries = [
