@@ -61,15 +61,9 @@ class ChatBot:
         # Start a daemon thread to listen for packets
         self.packet_thread = threading.Thread(target = self.receive_packet, daemon = True)
 
-        #sents = json.load(open("sentiments.json", 'r'))
-        #self.sentiments = {x: set(sents[x]) for x in sents}
 
     def connect(self, server, channel, nick):
         self.irc.connect(server, channel, nick)
-
-    #def respond_lyric(self, user, recv_msg):
-    #    """ responds to a user and advances the state."""
-    #    pass
 
     def check_preposition(self, text):
         if text in ['to', 'for']:
@@ -77,23 +71,40 @@ class ChatBot:
 
     def inquiry_reinquiry_lyric(self, user, recv_msg):
         """message is like Can i get lyrics to ___ by ___"""
-        response = "Sure, I'll find those lyrics for you."
-        self.send_message(user, response)
+        remove_these = ["to the song", "the song", ' song']
 
-        recv_msg = recv_msg.lower().split("lyrics")[1].split()
+        # remove the song phrase 
+        try:
+            for i in remove_these:
+                recv_msg = re.sub(i, "", recv_msg)
+        except TypeError:
+            self.send_message(user, "Make sure your query includes the phrase 'lyrics to <song_name> by <song_author>.'")
+            self.recv_history = self.recv_history[:-1]
+            return
+
+        # split on lyrics, right hand should be song name
+        recv_msg = recv_msg.lower().split("lyrics")[1].strip().split()
         # remove the preposition
         if self.check_preposition(recv_msg[0]):
             recv_msg = recv_msg[1:]
 
-        lyric_link, lyrics = get_lyrics(" ".join(recv_msg))#.split('\n')
+        print(recv_msg)
+
+        lyric_link, lyrics = get_lyrics(" ".join(recv_msg))
         if lyric_link == "":
-            self.send_message(user, "Unfortunately, I could not find the song you requested. Ask me again next time!")
+            self.send_message(user, "Unfortunately, I could not find the song you requested. Ask me again!")
+            self.send_message(user, "Make sure your query includes the phrase 'lyrics to <song_name> by <song_author>.'")
+            self.recv_history = self.recv_history[:-1]
+            return
+        # the good case
         else:
+            response = "Sure, I'll find those lyrics for you."
+            self.send_message(user, response)
             lyrics = lyrics.split('\n')
-            self.send_message(user, "Is this what you were looking for?")
-            time.sleep(0.2)
-            self.send_message(user, " | ".join(lyrics[:10]) + ".....")
-            time.sleep(0.2)
+            self.send_message(user, "Here are the first fifteen lines. Is this what you were looking for?")
+            time.sleep(0.5)
+            self.send_message(user, " | ".join(lyrics[:15]) + ".....")
+            time.sleep(0.5)
             self.send_message(user, "You can find the rest of the lyrics at {}".format("https://genius.com" + lyric_link))
 
         self.state = State.SENT_INQUIRY_REPLY
@@ -582,7 +593,7 @@ class ChatBot:
                 return
 
 def main():
-    bot = ChatBot(nick="s-bot", timeout=10)
+    bot = ChatBot(nick="spicy-bot", timeout=20)
     bot.run()
     pass
 
