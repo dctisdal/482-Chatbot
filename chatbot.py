@@ -105,7 +105,7 @@ class ChatBot:
             # We sent an outreach, and got a reply back.
             # We're speaking FIRST.
             # handled by the timeout function
-            if random.randint(0, 1) == -1 or user in self.names.keys(): # temporarily, always route to ask name...
+            if random.randint(0, 1) == 1 or user in self.names.keys():
                 self.inquiry(user, recv_msg)
             else:
                 self.ask_name(user, recv_msg)
