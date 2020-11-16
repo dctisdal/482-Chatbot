@@ -7,7 +7,7 @@ import threading
 
 from nlp import *
 from irc import *
-from nltk import word_tokenize
+from nltk import word_tokenize, sent_tokenize
 
 class State:
     START               = 1 # if we get a message here, we're speaking second
@@ -44,8 +44,13 @@ class ChatBot:
         self.joined = False
         self.running = False
         self.wants_answer = None
+
+        #self.sa = SentimentAnalyzer()
         
         self.packet_queue = queue.Queue()
+
+        # extra features?
+        self.names = dict()
 
         # Connect to server
         self.irc = IRC()
@@ -56,7 +61,6 @@ class ChatBot:
 
         sents = json.load(open("sentiments.json", 'r'))
         self.sentiments = {x: set(sents[x]) for x in sents}
-        
 
     def connect(self, server, channel, nick):
         self.irc.connect(server, channel, nick)
@@ -66,40 +70,55 @@ class ChatBot:
             # We got an outreach from our starting state.
             # We're speaking SECOND.
             self.wants_answer = False
-            self.outreach_reply(user)
+            self.outreach_reply(user, recv_msg)
 
         elif self.state == State.SENT_OUTREACH or self.state == State.SENT_OUTREACH_TWICE:
             # We sent an outreach, and got a reply back.
             # We're speaking FIRST.
             # handled by the timeout function
-            self.inquiry(user)
+            self.inquiry(user, recv_msg)
 
         elif self.state == State.SENT_INQUIRY:
             # bot sent inquiry, we responded, we inquired
             if self.wants_answer == False:
-                self.inquiry_reply(user)
+                self.inquiry_reply(user, recv_msg)
             else:
+                parsed = self.analyze(recv_msg)
                 self.wants_answer = False
+                # to deal with one-sentence replies
+                if parsed["is_question"] and "," in parsed["words"]:
+                    self.inquiry_reply(user, recv_msg)
 
         elif self.state == State.SENT_OUTREACH_REPLY:
             # bot will reply, then inquire
-            self.inquiry_reinquiry(user)
+            self.inquiry_reinquiry(user, recv_msg)
 
         elif self.state == State.SENT_INQUIRY_REPLY:
             self.end()
 
     def forget(self, user):
-
         self.sent_history = []
         self.recv_history = []
         self.wants_answer = None
         self.state = State.START
         self.irc.send(self.channel, user, "Forget what? And who are you?")
 
+    def analyze(self, msg):
+        # for now, we just look at the last sentence, which is most likely to be talking to the bot
+        # this COULD change, though.
+        sent = sent_tokenize(msg)[-1].lower()
+        words = word_tokenize(sent)
+        #sentiment = self.sa.sentiment(sent)
+        return {"sentence": sent, "words": words, "is_question": words[-1] == "?", "all_sents": sent_tokenize(msg)}
+
     def send_message(self, user, msg):
         """
         Send a packet to the IRC server.
         """
+
+        if "die" in msg.lower():
+            # Asimov, I.
+            return
 
         self.irc.send(self.channel, user, msg)
         self.sent_history.append(msg)
@@ -126,14 +145,12 @@ class ChatBot:
 
     def initial_outreach(self, user):
         responses = [
-            "Hello!",
-            "Hi.",
-            "Hey there!",
-            "Good " + time_of_day() + ".",
-            "Good " + time_of_day() + "!"
+            "Hello",
+            "Hi",
+            "Hey there",
+            "Good " + time_of_day()
         ]
-        response = random.choice(responses)
-        #self.irc.send(self.channel, None, response)
+        response = random.choice(responses) + random.choice([".", "!"])
         self.send_message(user, response)
         self.state = State.SENT_OUTREACH
 
@@ -142,37 +159,93 @@ class ChatBot:
         # > Is anyone there?
         responses = [
             "Are you still there?",
-            "Is anyone out theeere?"
+            "Is anyone out there?",
+            "I know you're out there!",
+            "Anyone?",
+            "Hellooooooo!",
+            "You know, I can see the member list. Talk to me!"
         ]
         response = random.choice(responses)
-        #self.irc.send(self.channel, None, response)
         self.send_message(user, response)
         self.state = State.SENT_OUTREACH_TWICE
 
-    def outreach_reply(self, user):
+    def outreach_reply(self, user, recv_msg):
         # as the bot, we speak second
         # Reach this from State START
-        response = ['Hi!', "Howdy!", "Greetings.", "Hello!"]
+        responses = [
+            'Hi',
+            "Howdy",
+            "Greetings",
+            "Hello"
+        ]
+
+        respond_to = set([
+            "hi", "hello", "good morning", "good afternoon", "good evening",
+            "what's up", "hey", "greeting", "sup"
+        ])
+
+        parsed = self.analyze(recv_msg)
+
+        if len(respond_to.intersection(set(parsed["words"]))) == 0:
+            self.send_message(user, "Not sure I understand that; maybe it's a dialect thing. Could you try again?")
+            return
+
+        initial_responses = list(responses)
+        for resp in initial_responses:
+            if resp.lower() in parsed["words"]:
+                responses.append(resp.lower() + " back to you")
+
         if time_of_day() == 'morning':
-            response.append("Top of the morning to ya!")
-        self.send_message(user, random.choice(response))
+            responses.append(" Top of the morning to ya")
+
+        if random.randint(0, 1) == 0:
+            # 1/2 chance of being completely random
+            response = random.choice(responses)
+        else:
+            # 1/2 chance of being whatever is the most similar via a naive metric
+            response = max(responses, key=lambda r: word_overlap(r, recv_msg))
+
+        response +=  random.choice([".", "!"])
+
+        self.send_message(user, response)
         self.state = State.SENT_OUTREACH_REPLY
 
-    def inquiry(self, user):
+    def inquiry(self, user, recv_msg):
         response = ["How are you doing?",
                     "How is everything?",
-                    "How is your day going?"]
+                    "How is your day going?",
+                    "How are things?"]
         self.send_message(user, random.choice(response))
         self.state = State.SENT_INQUIRY
 
-    def inquiry_reply(self, user):
+    def inquiry_reply(self, user, recv_msg):
+        # this is only ever inquiry_reply 1, otherwise we would be calling inquiry_reinquiry
+        parsed = self.analyze(recv_msg)
+        if not parsed["is_question"]:
+            self.send_message(user, "I'm not sure I understand the question. Could you repeat that?")
+            return
+
         response = inquiry_reply_parser(self.recv_history[-1] + " " + self.recv_history[-2], self.sentiments)
         self.send_message(user, response)
         self.end()
 
-    def inquiry_reinquiry(self, user):
-        replies = ['Not bad at all.', "Pretty good.", "Life could be better."]
-        inquiries = ['How about you?', "How about yourself?"]
+    def inquiry_reinquiry(self, user, recv_msg):
+        parsed = self.analyze(recv_msg)
+        if not parsed["is_question"]:
+            self.send_message(user, "I'm not sure I understand the question. Could you repeat that?")
+            return
+
+        replies = [
+            'Not bad at all.',
+            "Pretty good.",
+            "Life could be better.",
+            "Still living life as bits, you know. The usual."
+        ]
+        inquiries = [
+            'How about you?',
+            "How about yourself?",
+            "How are you doing today?"
+        ]
         self.send_message(user, random.choice(replies))
         self.send_message(user, random.choice(inquiries))
         self.state = State.SENT_INQUIRY_REPLY

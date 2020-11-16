@@ -1,0 +1,3 @@
+Initial Outreach: the person reaches out for the first time, saying "hi" or something similar
+
+Secondary Outreach: triggered after initial outreach via timeout; tries to re-contact the person

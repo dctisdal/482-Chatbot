@@ -12,7 +12,10 @@ class IRC:
 
     def send(self, channel, nick, msg):
         # Transfer data
-        self.irc.send(bytes("PRIVMSG " + channel + " :" + nick + ": " + msg + "\n", "UTF-8"))
+        if nick == None:
+            self.irc.send(bytes("PRIVMSG " + channel + " :" + msg + "\n", "UTF-8"))
+        else:
+            self.irc.send(bytes("PRIVMSG " + channel + " :" + nick + ": " + msg + "\n", "UTF-8"))
 
     def connect(self, server, channel, botnick):
         # Connect to the server

@@ -3,6 +3,10 @@ import nltk
 import json
 import random
 
+# import nltk
+# nltk.download("vader_lexicon")
+# from nltk.sentiment.vader import SentimentIntensityAnalyzer
+
 def inquiry_reply_parser(text, sentiments):
     """
     Returns a somewhat appropriate response to a given inquiry and response before inquiry.
@@ -82,3 +86,16 @@ def inquiry_reply_parser(text, sentiments):
         return random.choice(positive_responses) + " " + random.choice(neutral_responses)
     else:
         return random.choice(neutral_responses)
+
+def word_overlap(sent1, sent2):
+    words1, words2 = set(nltk.word_tokenize(sent1.lower())), set(nltk.word_tokenize(sent2.lower()))
+    return len(words1.intersection(words2))
+
+# class SentimentAnalyzer:
+#     def __init__(self):
+#         self.analyzer = SentimentIntensityAnalyzer()
+
+#     def sentiment(self, sent):
+#         # returns neg, neu, pos, compound
+#         scores = self.analyzer.polarity_scores(sent)
+#         return max(scores)
