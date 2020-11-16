@@ -86,14 +86,21 @@ class ChatBot:
 
         print(recv_msg)
 
-        lyrics = get_lyrics(" ".join(recv_msg)).split('\n')
+        lyric_link, lyrics = get_lyrics(" ".join(recv_msg))#.split('\n')
+        lyrics = lyrics.split('\n')
         self.send_message(user, response)
-        #inquiry = "Is this what you were looking for?" + '\n' + lyrics
-        self.send_message("Is this what you were looking for?")
+        self.send_message(user, "Is this what you were looking for?")
         row = 0
-        while row < 10:
-            self.send_message(user, lyrics[row])
+        while row <= 10:
+            if row == 10:
+                self.send_message(user, lyrics[row] + ".....")
+            else:
+                self.send_message(user, lyrics[row])
+            row += 1
             time.sleep(0.2)
+
+        self.send_message(user, "You can find the rest of the lyrics at {}".format("https://genius.com" + lyric_link))
+
         self.state = State.SENT_INQUIRY_REPLY
 
     

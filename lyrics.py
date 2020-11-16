@@ -254,4 +254,4 @@ def get_lyrics(text):
 
     print(re.sub("\n+", "\n", lyrics.strip()))
 
-    return re.sub("\n+", "\n", lyrics).strip()
+    return lyric_link, re.sub("\n+", "\n", lyrics).strip()
