@@ -11,3 +11,4 @@ time
 requests
 string
 re
+bs4
