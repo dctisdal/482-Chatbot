@@ -105,7 +105,7 @@ class ChatBot:
             # We sent an outreach, and got a reply back.
             # We're speaking FIRST.
             # handled by the timeout function
-            if random.randint(0, 1) == -1: # temporarily, always route to ask name...
+            if random.randint(0, 1) == -1 or user in self.names.keys(): # temporarily, always route to ask name...
                 self.inquiry(user, recv_msg)
             else:
                 self.ask_name(user, recv_msg)
@@ -143,6 +143,7 @@ class ChatBot:
         self.state = State.START
         self.irc.send(self.channel, user, "Forget what? And who are you?")
         self.user = None
+        self.names = dict()
 
     def analyze(self, msg):
         # for now, we just look at the last sentence, which is most likely to be talking to the bot
@@ -248,25 +249,78 @@ class ChatBot:
             # 1/2 chance of being whatever is the most similar via a naive metric
             response = max(responses, key=lambda r: word_overlap(r, recv_msg))
 
+        ### optional
+        name = self.parse_name(recv_msg)
+        if name is not None:
+            self.names[user] = name
+            response += ", {}".format(name)
+        ### end optional
+
         response +=  random.choice([".", "!"])
 
         self.send_message(user, response)
         self.state = State.SENT_OUTREACH_REPLY
 
     ### optional feature: name use ###
+    def parse_name(self, recv_msg):
+        intros = [
+            "name is",
+            "name's"
+        ]
+        parsed = self.analyze(recv_msg)
+        name = None
+        if len(parsed["words"]) == 1:
+            name = parsed["words"][0]
+        else:
+            lowered = recv_msg.lower()
+            for intro in intros:
+                if intro in lowered:
+                    split = lowered.split(intro, 2)[1]
+                    toked = word_tokenize(split)
+                    name = toked[0].capitalize()
+        return name
+
     def ask_name(self, user, recv_msg):
-        pass
+        responses = [
+            "Hi! What's your name?",
+            "What's your name, stranger?",
+            "How are you, uh... what's your name, again?",
+            "Hi, uhh... could you tell me your name, please?"
+        ]
+        response = random.choice(responses)
+        self.send_message(user, response)
+        self.state = State.SENT_NAME_REQUEST
 
     def name_reply(self, user, recv_msg):
-        pass
+        # this needs to parse and add it...
+        name = self.parse_name(recv_msg)
+
+        if name == None:
+            self.send_message(user, "I didn't understand that. Could you try responding in a simpler way?")
+            self.recv_history = self.recv_history[:-1]
+            return
+
+        responses = [
+            "Nice to meet you, {}!",
+            "A pleasure to make your acquaintance, {}!"
+        ]
+        self.names[user] = name
+        response = random.choice(responses).format(name)
+        self.send_message(user, response)
+        # this may need to be a diff message...
+        self.inquiry(user, recv_msg)
     ### end optional feature part  ###
 
     def inquiry(self, user, recv_msg):
-        response = ["How are you doing?",
-                    "How is everything?",
-                    "How is your day going?",
-                    "How are things?"]
-        self.send_message(user, random.choice(response))
+        responses = ["How are you doing{}?",
+                    "How is everything{}?",
+                    "How is your day going{}?",
+                    "How are things{}?"]
+        name = ""
+        if user in self.names.keys():
+            name = ", " + self.names[user]
+        response = random.choice(responses).format(name)
+        self.send_message(user, response)
         self.state = State.SENT_INQUIRY
 
     def generate_reply(self):
@@ -281,6 +335,19 @@ class ChatBot:
         considered = self.recv_history[-2]
         sentiment = self.sa.sentiment(considered)
 
+        if self.user in self.names.keys():
+            name = self.names[self.user]
+            negative_responses = [
+                "Don't worry, {}! I'm sure things will get better.".format(name),
+                "I'm sorry to hear that, {}. Stay strong!".format(name),
+                "It'll pass in time, {}, I'm sure!".format(name)
+            ]
+            positive_responses = [
+                "Wow, awesome! I'm glad to hear that, {}.".format(name),
+                "That's great, {}!".format(name),
+                "Amazing! So glad, {}!".format(name)
+            ]
+            
         if sentiment == "neg":
             return random.choice(negative_responses) + " " + random.choice(neutral_responses)
         elif sentiment == "pos":
@@ -499,7 +566,7 @@ class ChatBot:
                 return
 
 def main():
-    bot = ChatBot(timeout=10)
+    bot = ChatBot(nick="s-bot", timeout=10)
     bot.run()
     pass
 
