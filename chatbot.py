@@ -118,29 +118,37 @@ class ChatBot:
             time_msg = recv_msg.rstrip("?")
             time_msg = time_msg.split("time")[1]
             time_msg_list = time_msg.split("said")
-            subject = time_msg_list[0].strip(" ")
+            subject = time_msg_list[0].strip(" ").lower()
             p = time_msg_list[1].strip(" ")
+            found = False
 
             print("time msg: {} | subject: {} | phrase: {}".format(time_msg, subject, p))
-
-            if subject == "I":
-                for phrase, timestamp in self.sent_history:
+            if subject == "i":
+                for phrase, timestamp in self.recv_history[:-1]:
                     if p in phrase:
                         readable = time.ctime(timestamp)
                         self.send_message(user, 'I remember you said "{}" on {}'.format(p, readable))
-                        return
-                self.send_message(user, 'Sorry, but I do not have any record of you saying "{}". Ask me again!'.format(p))
+                        found = True
+                        break
+                if not found:
+                    time.sleep(0.5)
+                    self.send_message(user, 'Sorry, but I do not have any record of you saying "{}"'.format(p))
 
-            else:
-                for phrase, timestamp in self.recv_history:
+            elif subject == "you":
+                for phrase, timestamp in self.sent_history:
                     if p in phrase:
                         readable = time.ctime(timestamp)
                         self.send_message(user, 'I remember I said "{}" on {}'.format(p, readable))
-                        return
-                self.send_message(user, 'Sorry, but I do not have any record of me saying "{}". Ask me again!'.format(p))
-
-        except ValueError or TypeError:
+                        found = True
+                        break
+                if not found:
+                    time.sleep(0.5)
+                    self.send_message(user, 'Sorry, but I do not have any record of me saying "{}"'.format(p))
+            else:
+                raise ValueError
+        except:
             self.send_message(user, "Please use the format: time <I/you> said <phrase>")
+            return
         self.state = State.SENT_INQUIRY_REPLY
 
     def respond(self, user, recv_msg):
