@@ -42,7 +42,6 @@ class ChatBot:
         self.state = State.START
         self.sent_history = []
         self.recv_history = []
-        self.timer = 10000000000000 #
         self.timeout = timeout
         self.cooldown = 2
         self.joined = False
@@ -506,14 +505,14 @@ class ChatBot:
         # bot becomes first speaker here
         if self.state == State.START:
             self.initial_outreach(user)
-            self.timer = datetime.datetime.now().timestamp()
+            self.last_msg_time = datetime.datetime.now().timestamp()
             # awaits one answer in inquiry reply
             self.wants_answer = True
 
         # if bot already sent an outreach
         elif self.state == State.SENT_OUTREACH:
             self.secondary_outreach(user)
-            self.timer = datetime.datetime.now().timestamp()
+            self.last_msg_time = datetime.datetime.now().timestamp()
 
         # giveups
         # note that our bot can be either 1 or 2. this handles both cases
@@ -524,7 +523,7 @@ class ChatBot:
             self.state == State.SENT_INQUIRY_REPLY      # bot, as speaker 2, asked us a question
         ):
             self.giveup(user)
-            self.timer = datetime.datetime.now().timestamp()
+            self.last_msg_time = datetime.datetime.now().timestamp()
             
 
     def receive_packet(self):
@@ -551,7 +550,7 @@ class ChatBot:
         # bot realizes it has joined
         if (not self.joined and self.channel in text):
             self.joined = True
-            self.timer = datetime.datetime.now().timestamp()
+            self.last_msg_time = datetime.datetime.now().timestamp()
             return
 
         # deal with certain packet ID's
@@ -580,7 +579,7 @@ class ChatBot:
                 self.user = user
 
             # if there hasn't been 2 seconds before last msg, ignore
-            if datetime.datetime.now().timestamp() - self.timer < self.cooldown:
+            if datetime.datetime.now().timestamp() - self.last_msg_time < self.cooldown:
                 self.send_message(user, "Give me a moment. I need {} seconds to collect my thoughts.".format(self.cooldown))
                 self.recv_history = self.recv_history[:-1]
             else:
@@ -589,7 +588,7 @@ class ChatBot:
                     self.recv_history = self.recv_history[:-1]
                     return
                 # store time of last message.
-                self.timer = datetime.datetime.now().timestamp()
+                self.last_msg_time = datetime.datetime.now().timestamp()
                 self.respond_command(user, text)
 
 
@@ -652,7 +651,7 @@ class ChatBot:
                     initiate = 1
 
                 # handle timeout
-                if datetime.datetime.now().timestamp() - self.timer > max(self.timeout, self.cooldown):
+                if datetime.datetime.now().timestamp() - self.last_msg_time > max(self.timeout, self.cooldown):
                     self.handle_timeout(self.user)
 
                 # if we got a packet, dequeue it
