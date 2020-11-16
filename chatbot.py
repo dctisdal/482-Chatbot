@@ -128,6 +128,7 @@ class ChatBot:
                 for phrase, timestamp in self.recv_history[:-1]:
                     if p in phrase:
                         readable = time.ctime(timestamp)
+                        time.sleep(0.5)
                         self.send_message(user, 'I remember you said "{}" on {}'.format(p, readable))
                         self.send_message(user, "Was this the one you were thinking of, or another time?")
                         found = True
@@ -141,6 +142,7 @@ class ChatBot:
                 for phrase, timestamp in self.sent_history:
                     if p in phrase:
                         readable = time.ctime(timestamp)
+                        time.sleep(0.5)
                         self.send_message(user, 'I remember I said "{}" on {}'.format(p, readable))
                         self.send_message(user, "Was that what you were thinking of?")
                         found = True
@@ -154,6 +156,7 @@ class ChatBot:
         except:
             self.send_message(user, "Please use the format: time <I/you> said <phrase>")
             return
+        self.send_message(user, "Anyways, how were you doing to day?")
         self.state = State.SENT_INQUIRY_REPLY
 
     def respond(self, user, recv_msg):
