@@ -411,10 +411,16 @@ class ChatBot:
             info = get("https://geolocation-db.com/json/{}&position=true".format(None)).json()
         except:
             info = {}
+            info['state'] = "Nowhere"
             info['latitude'] = 34.05
             info['longitude'] = -118.2
-        forecast = get('http://api.openweathermap.org/data/2.5/weather?lat={}&lon={}&appid=b4a2c2b82fad9f62191b9237ea6a07e7'.format(info['latitude'],
-                                                                                                       info['longitude'])).json()
+        
+        try:
+            forecast = get('http://api.openweathermap.org/data/2.5/weather?lat={}&lon={}&appid=b4a2c2b82fad9f62191b9237ea6a07e7'.format(info['latitude'],
+                                                                                                        info['longitude'])).json()
+        except:
+            return info['state'], "skies existing"
+
         weather = forecast['weather'][0]['main'].lower()
         if weather == "thunderstorm":
             weather = weather + 's'
@@ -465,7 +471,7 @@ class ChatBot:
         #response = inquiry_reply_parser(self.recv_history[-1] + " " + self.recv_history[-2], self.sentiments)
         response = self.generate_reply() # implicitly received the recv_history
         loc, weather = self.get_loc_weather()
-        random.choice([response, response + " Afterall, I do like {}.".format(weather)])
+        response = random.choice([response, response + " Afterall, I do like {}.".format(weather)])
         self.send_message(user, response)
         self.end(user)
 
@@ -480,7 +486,7 @@ class ChatBot:
         replies = [
             "I kind of like {} here in {}. So not bad at all.".format(weather, loc),
             "I love {}. So great!".format(loc),
-            "A bit too {} here for my tastes. Life could be better.".format(weather),
+            "Not sure I like the weather here being {}. Life could be better.".format(weather),
             "Still living life as bits, you know. The usual."
         ]
         inquiries = [
@@ -668,7 +674,7 @@ class ChatBot:
                 return
 
 def main():
-    bot = ChatBot(nick="s-bot", channel="#CPE482B", timeout=20)
+    bot = ChatBot(nick="spicy-bot", channel="#CPE482A", timeout=20)
     bot.run()
     pass
 
