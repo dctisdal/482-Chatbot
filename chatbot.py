@@ -34,7 +34,7 @@ def time_of_day():
         return "evening"
 
 class ChatBot:
-    def __init__(self, server="irc.freenode.net", channel="#CPE482A", nick="spicy-bot", timeout=30):
+    def __init__(self, server="irc.freenode.net", channel="#CPE482", nick="spicy-bot", timeout=30):
         self.nick = nick
         self.user = None
         self.channel = channel
@@ -48,6 +48,7 @@ class ChatBot:
         self.joined = False
         self.running = False
         self.wants_answer = None
+        self.last_msg_time = 0
 
         self.sa = SentimentAnalyzer()
         
@@ -220,6 +221,10 @@ class ChatBot:
             # Asimov, I.
             return
 
+        if datetime.datetime.now().timestamp() - self.last_msg_time < self.cooldown:
+            time.sleep(self.cooldown)
+
+        self.last_msg_time = datetime.datetime.now().timestamp()
         self.irc.send(self.channel, user, msg)
         self.sent_history.append((msg, datetime.datetime.now().timestamp()))
 
@@ -650,7 +655,7 @@ class ChatBot:
                 return
 
 def main():
-    bot = ChatBot(nick="spicy-bot", timeout=20)
+    bot = ChatBot(nick="s-bot", channel="#CPE482A", timeout=20)
     bot.run()
     pass
 
