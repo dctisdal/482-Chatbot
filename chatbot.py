@@ -220,7 +220,7 @@ class ChatBot:
         """
         Send a packet to the IRC server.
         """
-        if "die" == msg.strip():
+        if "-bot: die" in msg.lower():
             # Asimov, I.
             return
 
