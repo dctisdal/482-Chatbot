@@ -112,33 +112,35 @@ class ChatBot:
 
     def inquiry_reinquiry_time(self, user, recv_msg):
         """message format: ___ time I/you said ____"""
-        remove_these = ["to the song", "the song", ' song']
 
-        # find subject
-        time_msg = recv_msg.rstrip("?")
-        time_msg = time_msg.split("time")[1]
-        time_msg_list = time_msg.split("said")
-        subject = time_msg_list[0].strip(" ")
-        p = time_msg_list[1].strip(" ")
+        try:
+            # find subject
+            time_msg = recv_msg.rstrip("?")
+            time_msg = time_msg.split("time")[1]
+            time_msg_list = time_msg.split("said")
+            subject = time_msg_list[0].strip(" ")
+            p = time_msg_list[1].strip(" ")
 
-        print("time msg: {} | subject: {} | phrase: {}".format(time_msg, subject, p))
+            print("time msg: {} | subject: {} | phrase: {}".format(time_msg, subject, p))
 
-        if subject == "I":
-            for phrase, timestamp in self.sent_history:
-                if p in phrase:
-                    readable = time.ctime(timestamp)
-                    self.send_message(user, 'I remember you said "{}" on {}'.format(p, readable))
-                    return
-            self.send_message(user, 'Sorry, but I do not have any record of you saying "{}". Ask me again!'.format(p))
+            if subject == "I":
+                for phrase, timestamp in self.sent_history:
+                    if p in phrase:
+                        readable = time.ctime(timestamp)
+                        self.send_message(user, 'I remember you said "{}" on {}'.format(p, readable))
+                        return
+                self.send_message(user, 'Sorry, but I do not have any record of you saying "{}". Ask me again!'.format(p))
 
-        else:
-            for phrase, timestamp in self.recv_history:
-                if p in phrase:
-                    readable = time.ctime(timestamp)
-                    self.send_message(user, 'I remember I said "{}" on {}'.format(p, readable))
-                    return
-            self.send_message(user, 'Sorry, but I do not have any record of me saying "{}". Ask me again!'.format(p))
+            else:
+                for phrase, timestamp in self.recv_history:
+                    if p in phrase:
+                        readable = time.ctime(timestamp)
+                        self.send_message(user, 'I remember I said "{}" on {}'.format(p, readable))
+                        return
+                self.send_message(user, 'Sorry, but I do not have any record of me saying "{}". Ask me again!'.format(p))
 
+        except ValueError or TypeError:
+            self.send_message(user, "Please use the format: time <I/you> said <phrase>")
         self.state = State.SENT_INQUIRY_REPLY
 
     def respond(self, user, recv_msg):
@@ -175,7 +177,7 @@ class ChatBot:
 
         elif self.state == State.SENT_OUTREACH_REPLY:
             # bot will reply, then inquire
-            if "lyric" in recv_msg:
+            if "lyric" in recv_msg and "to" in recv_msg and "by" in recv_msg:
                 self.inquiry_reinquiry_lyric(user, recv_msg)
             elif "time" in recv_msg and "said" in recv_msg:
                 self.inquiry_reinquiry_time(user, recv_msg)
