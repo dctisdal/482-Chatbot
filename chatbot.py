@@ -289,7 +289,7 @@ class ChatBot:
                 responses.append(resp.lower() + " back to you")
 
         if time_of_day() == 'morning':
-            responses.append(" Top of the morning to ya")
+            responses.append("Top of the morning to ya")
 
         if random.randint(0, 1) == 0:
             # 1/2 chance of being completely random
@@ -437,7 +437,7 @@ class ChatBot:
         #response = inquiry_reply_parser(self.recv_history[-1] + " " + self.recv_history[-2], self.sentiments)
         response = self.generate_reply() # implicitly received the recv_history
         loc, weather = self.get_loc_weather()
-        response = response + " Afterall, I do like {}.".format(weather)
+        random.choice([response, response + " Afterall, I do like {}.".format(weather)])
         self.send_message(user, response)
         self.end(user)
 
@@ -449,10 +449,9 @@ class ChatBot:
             return
 
         loc, weather = self.get_loc_weather()
-        response = "Well, I love {} here in {}. So...".format(weather, loc)
         replies = [
             "I kind of like {} here in {}. So not bad at all.".format(weather, loc),
-            "I love {} in {}. So great!".format(weather, loc),
+            "I love {}. So great!".format(loc),
             "A bit too {} here for my tastes. Life could be better.".format(weather),
             "Still living life as bits, you know. The usual."
         ]
