@@ -334,7 +334,6 @@ class ChatBot:
         intros = [
             "name is",
             "name's",
-            "im",
             "i am",
             "i'm"
         ]
