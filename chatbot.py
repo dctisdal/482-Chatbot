@@ -132,7 +132,7 @@ class ChatBot:
                         found = True
                         break
                 if not found:
-                    time.sleep(0.5)
+                    #time.sleep(0.5)
                     self.send_message(user, 'Sorry, but I do not have any record of you saying "{}"'.format(p))
 
             elif subject == "you":
@@ -179,7 +179,7 @@ class ChatBot:
                 parsed = self.analyze(recv_msg)
                 self.wants_answer = False
                 # to deal with one-sentence replies
-                if parsed["is_question"] and "," in parsed["words"]:
+                if parsed is not None and parsed["is_question"] and "," in parsed["words"]:
                     # pad so we don't consider an extra sentence in sentiment analysis
                     self.recv_history.append("")
                     self.inquiry_reply(user, recv_msg)
@@ -220,7 +220,7 @@ class ChatBot:
         """
         Send a packet to the IRC server.
         """
-        if "die" in msg.lower():
+        if "die" == msg.strip():
             # Asimov, I.
             return
 
@@ -341,6 +341,9 @@ class ChatBot:
             "i'm"
         ]
         parsed = self.analyze(recv_msg)
+        if parsed is None:
+            return None
+
         name = None
 
         # bug, saves name when you enter one word
@@ -446,7 +449,7 @@ class ChatBot:
     def inquiry_reply(self, user, recv_msg):
         # this is only ever inquiry_reply 1, otherwise we would be calling inquiry_reinquiry
         parsed = self.analyze(recv_msg)
-        if not parsed["is_question"]:
+        if parsed is None or not parsed["is_question"]:
             self.send_message(user, "I'm not sure I understand the question. Could you repeat that?")
             self.recv_history = self.recv_history[:-1]
             return
@@ -460,7 +463,7 @@ class ChatBot:
 
     def inquiry_reinquiry(self, user, recv_msg):
         parsed = self.analyze(recv_msg)
-        if not parsed["is_question"]:
+        if parsed is None or not parsed["is_question"]:
             self.send_message(user, "I'm not sure I understand the question. Could you repeat that?")
             self.recv_history = self.recv_history[:-1]
             return
@@ -657,7 +660,7 @@ class ChatBot:
                 return
 
 def main():
-    bot = ChatBot(nick="s-bot", channel="#CPE482A", timeout=20)
+    bot = ChatBot(nick="s-bot", channel="#CPE482B", timeout=20)
     bot.run()
     pass
 
