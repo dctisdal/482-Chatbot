@@ -45,7 +45,7 @@ class ChatBot:
         self.running = False
         self.wants_answer = None
 
-        #self.sa = SentimentAnalyzer()
+        self.sa = SentimentAnalyzer()
         
         self.packet_queue = queue.Queue()
 
@@ -87,6 +87,8 @@ class ChatBot:
                 self.wants_answer = False
                 # to deal with one-sentence replies
                 if parsed["is_question"] and "," in parsed["words"]:
+                    # pad so we don't consider an extra sentence in sentiment analysis
+                    self.recv_history.append("")
                     self.inquiry_reply(user, recv_msg)
 
         elif self.state == State.SENT_OUTREACH_REPLY:
@@ -108,8 +110,8 @@ class ChatBot:
         # this COULD change, though.
         sent = sent_tokenize(msg)[-1].lower()
         words = word_tokenize(sent)
-        #sentiment = self.sa.sentiment(sent)
-        return {"sentence": sent, "words": words, "is_question": words[-1] == "?", "all_sents": sent_tokenize(msg)}
+        sentiment = self.sa.sentiment(sent)
+        return {"sentence": sent, "words": words, "is_question": words[-1] == "?", "all_sents": sent_tokenize(msg), "sentiment": sentiment}
 
     def send_message(self, user, msg):
         """
@@ -188,6 +190,7 @@ class ChatBot:
 
         if len(respond_to.intersection(set(parsed["words"]))) == 0:
             self.send_message(user, "Not sure I understand that; maybe it's a dialect thing. Could you try again?")
+            self.recv_history = self.recv_history[:-1]
             return
 
         initial_responses = list(responses)
@@ -218,14 +221,35 @@ class ChatBot:
         self.send_message(user, random.choice(response))
         self.state = State.SENT_INQUIRY
 
+    def generate_reply(self):
+        negative_responses = ["Hopefully things get better for you.", "Sorry to hear about that.", 
+                            "I hope your situation will improve soon."]
+        positive_responses = ["I'm glad you're doing well!", 
+                                "Awesome!",
+                                "Wow! Glad to hear :)"]
+        neutral_responses = ["I am doing fine.", 
+                                "Pretty good for me."]
+        
+        considered = self.recv_history[-2]
+        sentiment = self.sa.sentiment(considered)
+
+        if sentiment == "neg":
+            return random.choice(negative_responses) + " " + random.choice(neutral_responses)
+        elif sentiment == "pos":
+            return random.choice(positive_responses) + " " + random.choice(neutral_responses)
+        else:
+            return random.choice(neutral_responses)
+
     def inquiry_reply(self, user, recv_msg):
         # this is only ever inquiry_reply 1, otherwise we would be calling inquiry_reinquiry
         parsed = self.analyze(recv_msg)
         if not parsed["is_question"]:
             self.send_message(user, "I'm not sure I understand the question. Could you repeat that?")
+            self.recv_history = self.recv_history[:-1]
             return
 
-        response = inquiry_reply_parser(self.recv_history[-1] + " " + self.recv_history[-2], self.sentiments)
+        #response = inquiry_reply_parser(self.recv_history[-1] + " " + self.recv_history[-2], self.sentiments)
+        response = self.generate_reply() # implicitly received the recv_history
         self.send_message(user, response)
         self.end()
 
@@ -233,6 +257,7 @@ class ChatBot:
         parsed = self.analyze(recv_msg)
         if not parsed["is_question"]:
             self.send_message(user, "I'm not sure I understand the question. Could you repeat that?")
+            self.recv_history = self.recv_history[:-1]
             return
 
         replies = [
@@ -336,6 +361,7 @@ class ChatBot:
             # if there hasn't been 2 seconds before last msg, ignore
             if datetime.datetime.now().timestamp() - self.timer < self.cooldown:
                 self.send_message(user, "Give me a moment. I need {} seconds to collect my thoughts.".format(self.cooldown))
+                self.recv_history = self.recv_history[:-1]
             else:
                 # store time of last message.
                 self.timer = datetime.datetime.now().timestamp()
