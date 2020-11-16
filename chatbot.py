@@ -351,12 +351,18 @@ class ChatBot:
             "Still living life as bits, you know. The usual."
         ]
         inquiries = [
-            'How about you?',
-            "How about yourself?",
-            "How are you doing today?"
+            'How about you{}?',
+            "How about yourself{}?",
+            "How are you doing today{}?"
         ]
+
+        name = ""
+        if user in self.names.keys():
+            name = ", " + self.names[user]
+        inquiry = random.choice(inquiries).format(name)
+        
         self.send_message(user, random.choice(replies))
-        self.send_message(user, random.choice(inquiries))
+        self.send_message(user, inquiry)
         self.state = State.SENT_INQUIRY_REPLY
 
     def handle_timeout(self, user):
