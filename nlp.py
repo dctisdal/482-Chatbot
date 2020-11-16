@@ -7,7 +7,7 @@ import random
 # nltk.download("vader_lexicon")
 # from nltk.sentiment.vader import SentimentIntensityAnalyzer
 
-def inquiry_reply_parser(text, sentiments):
+def inquiry_reply_parser(text, sentiments, name=None):
     """
     Returns a somewhat appropriate response to a given inquiry and response before inquiry.
     """
