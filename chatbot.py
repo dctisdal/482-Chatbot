@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import queue
 import random
 import datetime
@@ -61,7 +62,6 @@ class ChatBot:
         # Start a daemon thread to listen for packets
         self.packet_thread = threading.Thread(target = self.receive_packet, daemon = True)
 
-
     def connect(self, server, channel, nick):
         self.irc.connect(server, channel, nick)
 
@@ -88,7 +88,7 @@ class ChatBot:
         if self.check_preposition(recv_msg[0]):
             recv_msg = recv_msg[1:]
 
-        print(recv_msg)
+        print("lyrics msg: ", recv_msg)
 
         lyric_link, lyrics = get_lyrics(" ".join(recv_msg))
         if lyric_link == "":
@@ -109,7 +109,36 @@ class ChatBot:
 
         self.state = State.SENT_INQUIRY_REPLY
 
-    
+    def inquiry_reinquiry_time(self, user, recv_msg):
+        """message format: ___ time I/you said ____"""
+        remove_these = ["to the song", "the song", ' song']
+
+        # find subject
+        time_msg = recv_msg.rstrip("?")
+        time_msg = time_msg.split("time")[1]
+        time_msg_list = time_msg.split("said")
+        subject = time_msg_list[0].strip(" ")
+        p = time_msg_list[1].strip(" ")
+
+        print("time msg: {} | subject: {} | phrase: {}".format(time_msg, subject, p))
+
+        if subject == "I":
+            for phrase, timestamp in self.sent_history:
+                if p in phrase:
+                    readable = time.ctime(timestamp)
+                    self.send_message(user, 'I remember I said "{}" on {}'.format(p, readable))
+                    return
+            self.send_message(user, 'Sorry, but I do not have any record of me saying "{}". Ask me again!'.format(p))
+
+        else:
+            for phrase, timestamp in self.recv_history:
+                if p in phrase:
+                    readable = time.ctime(timestamp)
+                    self.send_message(user, 'I remember you said "{}" on {}'.format(p, readable))
+                    return
+            self.send_message(user, 'Sorry, but I do not have any record of you saying "{}". Ask me again!'.format(p))
+
+        self.state = State.SENT_INQUIRY_REPLY
 
     def respond(self, user, recv_msg):
         if self.state == State.START:
@@ -147,6 +176,8 @@ class ChatBot:
             # bot will reply, then inquire
             if "lyric" in recv_msg:
                 self.inquiry_reinquiry_lyric(user, recv_msg)
+            elif "time" in recv_msg:
+                self.inquiry_reinquiry_time(user, recv_msg)
             else:
                 self.inquiry_reinquiry(user, recv_msg)
 
@@ -174,13 +205,12 @@ class ChatBot:
         """
         Send a packet to the IRC server.
         """
-
         if "die" in msg.lower():
             # Asimov, I.
             return
 
         self.irc.send(self.channel, user, msg)
-        self.sent_history.append(msg)
+        self.sent_history.append((msg, datetime.datetime.now().timestamp()))
 
     def end(self):
         """
@@ -359,7 +389,7 @@ class ChatBot:
         neutral_responses = ["I am doing fine.", 
                                 "Pretty good for me."]
         
-        considered = self.recv_history[-2]
+        considered = self.recv_history[-2][0]
         sentiment = self.sa.sentiment(considered)
 
         if self.user in self.names.keys():
@@ -518,7 +548,7 @@ class ChatBot:
         """
         text = text.split(':', 3)
         recv_msg = text[3].lstrip(" ").rstrip("\r\n").lower()
-        self.recv_history.append(recv_msg)
+        self.recv_history.append((recv_msg, datetime.datetime.now().timestamp()))
 
         # 3 builtins: forget, die, name all
         # these won't use self.send_message because we don't actually want to log these
