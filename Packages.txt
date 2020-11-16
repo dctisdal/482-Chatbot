@@ -12,3 +12,4 @@ requests
 string
 re
 bs4
+lxml
