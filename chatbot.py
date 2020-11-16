@@ -104,6 +104,7 @@ class ChatBot:
         self.wants_answer = None
         self.state = State.START
         self.irc.send(self.channel, user, "Forget what? And who are you?")
+        self.user = None
 
     def analyze(self, msg):
         # for now, we just look at the last sentence, which is most likely to be talking to the bot
@@ -132,6 +133,7 @@ class ChatBot:
         """
         # self.sent_history = []
         # self.recv_history = []
+        self.user = None
         self.wants_answer = None
         self.state = State.START
 
@@ -183,7 +185,7 @@ class ChatBot:
 
         respond_to = set([
             "hi", "hello", "good morning", "good afternoon", "good evening",
-            "what's up", "hey", "greeting", "sup"
+            "what's up", "hey", "greeting", "sup", "yo"
         ])
 
         parsed = self.analyze(recv_msg)
@@ -317,7 +319,6 @@ class ChatBot:
         """
         Kill the client and close the socket.
         """
-
         self.running = False
         self.irc.send(self.channel, user, "So long and thanks for all the phish...")
         self.irc.die(self.channel)
@@ -326,9 +327,6 @@ class ChatBot:
         """
         Upon receiving a text packet, this function handles how to respond.
         """
-
-
-
         # bot realizes it has joined
         if (not self.joined and self.channel in text):
             self.joined = True
@@ -346,23 +344,29 @@ class ChatBot:
             # remove self name
             user = text.split(":")[2].strip().split(" ")
             user.remove(self.nick)
-            self.user = random.choice(user)
+            #self.user = random.choice(user)
             return
 
         # if spec asked for other packet id's they'd go here
 
         # from here on out, all packets are user input cases
         user = text.split(':', 3)[1].split('!')[0]
-        self.user = user
+        #self.user = user
 
         # respond to user, if we were prompted by specific user input
         if text is not None and self.nick + ":" in text and self.channel in text:
+            if self.state == State.START or self.state == State.SENT_OUTREACH or self.state == State.SENT_OUTREACH_TWICE:
+                self.user = user
 
             # if there hasn't been 2 seconds before last msg, ignore
             if datetime.datetime.now().timestamp() - self.timer < self.cooldown:
                 self.send_message(user, "Give me a moment. I need {} seconds to collect my thoughts.".format(self.cooldown))
                 self.recv_history = self.recv_history[:-1]
             else:
+                if self.user != user:
+                    self.send_message(user, "Please don't interrupt the conversation! I'll talk to you in a second, okay?")
+                    self.recv_history = self.recv_history[:-1]
+                    return
                 # store time of last message.
                 self.timer = datetime.datetime.now().timestamp()
                 self.respond_command(user, text)

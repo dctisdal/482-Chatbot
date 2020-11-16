@@ -42,7 +42,6 @@ class IRC:
 
     # send quit and close the socket
     def die(self, channel):
-
         self.irc.send(bytes("QUIT " + channel + "\n", "UTF-8"))
         # wait for IRC to accept quit
         time.sleep(2)
