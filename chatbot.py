@@ -78,28 +78,23 @@ class ChatBot:
     def inquiry_reinquiry_lyric(self, user, recv_msg):
         """message is like Can i get lyrics to ___ by ___"""
         response = "Sure, I'll find those lyrics for you."
-        
+        self.send_message(user, response)
+
         recv_msg = recv_msg.lower().split("lyrics")[1].split()
         # remove the preposition
         if self.check_preposition(recv_msg[0]):
             recv_msg = recv_msg[1:]
 
-        print(recv_msg)
-
         lyric_link, lyrics = get_lyrics(" ".join(recv_msg))#.split('\n')
-        lyrics = lyrics.split('\n')
-        self.send_message(user, response)
-        self.send_message(user, "Is this what you were looking for?")
-        row = 0
-        while row <= 10:
-            if row == 10:
-                self.send_message(user, lyrics[row] + ".....")
-            else:
-                self.send_message(user, lyrics[row])
-            row += 1
+        if lyric_link == "":
+            self.send_message(user, "Unfortunately, I could not find the song you requested. Ask me again next time!")
+        else:
+            lyrics = lyrics.split('\n')
+            self.send_message(user, "Is this what you were looking for?")
             time.sleep(0.2)
-
-        self.send_message(user, "You can find the rest of the lyrics at {}".format("https://genius.com" + lyric_link))
+            self.send_message(user, " | ".join(lyrics[:10]) + ".....")
+            time.sleep(0.2)
+            self.send_message(user, "You can find the rest of the lyrics at {}".format("https://genius.com" + lyric_link))
 
         self.state = State.SENT_INQUIRY_REPLY
 
@@ -235,7 +230,7 @@ class ChatBot:
 
         respond_to = set([
             "hi", "hello", "good morning", "good afternoon", "good evening",
-            "what's up", "hey", "greeting", "sup", "yo"
+            "what's up", "hey", "greeting", "sup", "yo", "hai"
         ])
 
         parsed = self.analyze(recv_msg)
@@ -261,7 +256,11 @@ class ChatBot:
             response = max(responses, key=lambda r: word_overlap(r, recv_msg))
 
         ### optional
-        name = self.parse_name(recv_msg)
+        # this right here will trigger a bug, patched it. modules would be ideal here as functions are running into each other
+        name = None
+        print(user, self.names)
+        if user not in self.names:
+            name = self.parse_name(recv_msg)
         if name is not None:
             self.names[user] = name
             response += ", {}".format(name)
@@ -276,14 +275,21 @@ class ChatBot:
     def parse_name(self, recv_msg):
         intros = [
             "name is",
-            "name's"
+            "name's",
+            "im",
+            "i am",
+            "i'm"
         ]
+        single_word_greetings = ["hi", "hello", "sup", "yo", "hai", "hey", "howdy"]
         parsed = self.analyze(recv_msg)
         name = None
-        if len(parsed["words"]) == 1:
+
+        # bug, saves name when you enter one word
+        if len(parsed["words"]) == 1 and parsed["words"][0] not in single_word_greetings:
             name = parsed["words"][0]
         else:
             lowered = recv_msg.lower()
+            print(lowered)
             for intro in intros:
                 if intro in lowered:
                     split = lowered.split(intro, 2)[1]

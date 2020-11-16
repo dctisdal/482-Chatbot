@@ -238,20 +238,18 @@ def get_lyrics(text):
     print(text)
     artists, name = text[1], text[0]
     lyric_link, full_title = get_lyric_link(artists, name)
-    print("Lyric link is", lyric_link)
-    print("Full title is", full_title)
-    lyrics = scrape_lyrics(artists, name, lyric_link)
-    
+    if lyric_link == "":
+        return "", ""
+    else:
+        lyrics = scrape_lyrics(artists, name, lyric_link)
 
-    if 'cloud_flare_always_on_short_message' in lyrics:
-        name_regex = title_normalizer_cloudflare(lyrics.split("|")[0].strip())
-        idxs = list(re.finditer(name_regex, lyrics, flags = re.I | re.S))
-        lyrics = lyrics[idxs[-1].start():]  
+        if 'cloud_flare_always_on_short_message' in lyrics:
+            name_regex = title_normalizer_cloudflare(lyrics.split("|")[0].strip())
+            idxs = list(re.finditer(name_regex, lyrics, flags = re.I | re.S))
+            lyrics = lyrics[idxs[-1].start():]  
 
-    lyrics = lyrics.strip()
-    lyrics = re.sub("\[.+?\]", "", lyrics)
-    lyrics = re.sub("[Aa]lbum", "", lyrics)
+        lyrics = lyrics.strip()
+        lyrics = re.sub("\[.+?\]", "", lyrics)
+        lyrics = re.sub("[Aa]lbum", "", lyrics)
 
-    print(re.sub("\n+", "\n", lyrics.strip()))
-
-    return lyric_link, re.sub("\n+", "\n", lyrics).strip()
+        return lyric_link, re.sub("\n+", "\n", lyrics).strip()
