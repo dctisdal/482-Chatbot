@@ -9,6 +9,7 @@ import threading
 from nlp import *
 from irc import *
 from lyrics import *
+from requests import get
 from nltk import word_tokenize, sent_tokenize
 
 class State:
@@ -126,17 +127,17 @@ class ChatBot:
             for phrase, timestamp in self.sent_history:
                 if p in phrase:
                     readable = time.ctime(timestamp)
-                    self.send_message(user, 'I remember I said "{}" on {}'.format(p, readable))
+                    self.send_message(user, 'I remember you said "{}" on {}'.format(p, readable))
                     return
-            self.send_message(user, 'Sorry, but I do not have any record of me saying "{}". Ask me again!'.format(p))
+            self.send_message(user, 'Sorry, but I do not have any record of you saying "{}". Ask me again!'.format(p))
 
         else:
             for phrase, timestamp in self.recv_history:
                 if p in phrase:
                     readable = time.ctime(timestamp)
-                    self.send_message(user, 'I remember you said "{}" on {}'.format(p, readable))
+                    self.send_message(user, 'I remember I said "{}" on {}'.format(p, readable))
                     return
-            self.send_message(user, 'Sorry, but I do not have any record of you saying "{}". Ask me again!'.format(p))
+            self.send_message(user, 'Sorry, but I do not have any record of me saying "{}". Ask me again!'.format(p))
 
         self.state = State.SENT_INQUIRY_REPLY
 
@@ -176,13 +177,13 @@ class ChatBot:
             # bot will reply, then inquire
             if "lyric" in recv_msg:
                 self.inquiry_reinquiry_lyric(user, recv_msg)
-            elif "time" in recv_msg:
+            elif "time" in recv_msg and "said" in recv_msg:
                 self.inquiry_reinquiry_time(user, recv_msg)
             else:
                 self.inquiry_reinquiry(user, recv_msg)
 
         elif self.state == State.SENT_INQUIRY_REPLY:
-            self.end()
+            self.end(user)
 
     def forget(self, user):
         self.sent_history = []
@@ -212,13 +213,14 @@ class ChatBot:
         self.irc.send(self.channel, user, msg)
         self.sent_history.append((msg, datetime.datetime.now().timestamp()))
 
-    def end(self):
+    def end(self, user):
         """
         After we hit end, we force bot to start again.
         Set bot states to default.
         """
         # self.sent_history = []
         # self.recv_history = []
+        self.send_message(user, "See you later.")
         self.user = None
         self.wants_answer = None
         self.state = State.START
@@ -231,7 +233,7 @@ class ChatBot:
             "I guess it wasn't important."
         ]
         self.send_message(user, random.choice(responses))
-        self.end()
+        self.end(user)
 
     def initial_outreach(self, user):
         responses = [
@@ -376,9 +378,21 @@ class ChatBot:
         name = ""
         if user in self.names.keys():
             name = ", " + self.names[user]
+
         response = random.choice(responses).format(name)
         self.send_message(user, response)
         self.state = State.SENT_INQUIRY
+
+    def get_loc_weather(self):
+        info = get("https://geolocation-db.com/json/{}&position=true".format(None)).json()
+        forecast = get('http://api.openweathermap.org/data/2.5/weather?lat={}&lon={}&appid=b4a2c2b82fad9f62191b9237ea6a07e7'.format(info['latitude'],
+                                                                                                       info['longitude'])).json()
+        weather = forecast['weather'][0]['main'].lower()
+        if weather == "thunderstorm":
+            weather = weather + 's'
+        elif weather == "clear":
+            weather = "clear skies"
+        return info['state'], weather
 
     def generate_reply(self):
         negative_responses = ["Hopefully things get better for you.", "Sorry to hear about that.", 
@@ -422,8 +436,10 @@ class ChatBot:
 
         #response = inquiry_reply_parser(self.recv_history[-1] + " " + self.recv_history[-2], self.sentiments)
         response = self.generate_reply() # implicitly received the recv_history
+        loc, weather = self.get_loc_weather()
+        response = response + " Afterall, I do like {}.".format(weather)
         self.send_message(user, response)
-        self.end()
+        self.end(user)
 
     def inquiry_reinquiry(self, user, recv_msg):
         parsed = self.analyze(recv_msg)
@@ -432,10 +448,12 @@ class ChatBot:
             self.recv_history = self.recv_history[:-1]
             return
 
+        loc, weather = self.get_loc_weather()
+        response = "Well, I love {} here in {}. So...".format(weather, loc)
         replies = [
-            'Not bad at all.',
-            "Pretty good.",
-            "Life could be better.",
+            "I kind of like {} here in {}. So not bad at all.".format(weather, loc),
+            "I love {} in {}. So great!".format(weather, loc),
+            "A bit too {} here for my tastes. Life could be better.".format(weather),
             "Still living life as bits, you know. The usual."
         ]
         inquiries = [

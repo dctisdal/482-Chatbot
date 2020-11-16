@@ -52,3 +52,4 @@ class IRC:
     def name_all(self, channel, nick):
         self.irc.send(bytes("NAMES " + channel + " :" + nick + ": \n", "UTF-8"))
 
+
