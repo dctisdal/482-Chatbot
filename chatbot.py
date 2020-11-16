@@ -260,7 +260,7 @@ class ChatBot:
         name = None
         print(user, self.names)
         if user not in self.names:
-            name = self.parse_name(recv_msg)
+            name = self.parse_name(recv_msg, assume_one_word_is_name=False)
         if name is not None:
             self.names[user] = name
             response += ", {}".format(name)
@@ -272,7 +272,7 @@ class ChatBot:
         self.state = State.SENT_OUTREACH_REPLY
 
     ### optional feature: name use ###
-    def parse_name(self, recv_msg):
+    def parse_name(self, recv_msg, assume_one_word_is_name=False):
         intros = [
             "name is",
             "name's",
@@ -280,13 +280,12 @@ class ChatBot:
             "i am",
             "i'm"
         ]
-        single_word_greetings = ["hi", "hello", "sup", "yo", "hai", "hey", "howdy"]
         parsed = self.analyze(recv_msg)
         name = None
 
         # bug, saves name when you enter one word
-        if len(parsed["words"]) == 1 and parsed["words"][0] not in single_word_greetings:
-            name = parsed["words"][0]
+        if len(parsed["words"]) == 1 and assume_one_word_is_name:
+            name = parsed["words"][0].capitalize()
         else:
             lowered = recv_msg.lower()
             print(lowered)
@@ -310,7 +309,7 @@ class ChatBot:
 
     def name_reply(self, user, recv_msg):
         # this needs to parse and add it...
-        name = self.parse_name(recv_msg)
+        name = self.parse_name(recv_msg, assume_one_word_is_name=True)
 
         if name == None:
             self.send_message(user, "I didn't understand that. Could you try responding in a simpler way?")
