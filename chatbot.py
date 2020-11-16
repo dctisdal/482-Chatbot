@@ -407,7 +407,12 @@ class ChatBot:
         self.state = State.SENT_INQUIRY
 
     def get_loc_weather(self):
-        info = get("https://geolocation-db.com/json/{}&position=true".format(None)).json()
+        try:
+            info = get("https://geolocation-db.com/json/{}&position=true".format(None)).json()
+        except:
+            info = {}
+            info['latitude'] = 34.05
+            info['longitude'] = -118.2
         forecast = get('http://api.openweathermap.org/data/2.5/weather?lat={}&lon={}&appid=b4a2c2b82fad9f62191b9237ea6a07e7'.format(info['latitude'],
                                                                                                        info['longitude'])).json()
         weather = forecast['weather'][0]['main'].lower()
