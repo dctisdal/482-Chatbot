@@ -1,0 +1,98 @@
+All of these chatlogs were taken consecutively, and so some persistent memory is used across them all.
+
+=== Conversation 1 ===
+spicy-bot
+00:57:54
+Hello.
+@ccw
+00:57:59
+spicy-bot: Hello!
+spicy-bot
+00:57:59
+ccw: How are you doing?
+@ccw
+00:58:06
+spicy-bot: Good.
+spicy-bot: How are you?
+spicy-bot
+00:58:09
+ccw: Wow! Glad to hear :) I am doing fine.
+
+=== Conversation 2 ===
+@ccw
+00:58:23
+spicy-bot: Hi there!
+spicy-bot
+00:58:23
+ccw: Howdy.
+@ccw
+00:58:27
+spicy-bot: How ya doin?
+spicy-bot
+00:58:28
+ccw: Not bad at all.
+ccw: How about yourself?
+@ccw
+00:58:33
+spicy-bot: Tired, but okay!
+
+=== Conversation 3 ===
+@ccw
+00:58:33
+spicy-bot: Hi, my name is Caleb.
+spicy-bot
+00:58:52
+ccw: Hi, Caleb!
+@ccw
+00:58:59
+spicy-bot: How are you doing, spicy-bot?
+spicy-bot
+00:58:59
+ccw: Pretty good.
+ccw: How about you?
+@ccw
+00:59:03
+spicy-bot: Great.
+
+=== Conversation 4 ===
+spicy-bot
+00:59:24
+Good morning!
+@ccw
+00:59:29
+spicy-bot: Hi!
+spicy-bot
+00:59:29
+ccw: How are things, Caleb?
+@ccw
+00:59:34
+spicy-bot: Good, good.
+spicy-bot: And you?
+spicy-bot
+00:59:38
+ccw: Amazing! So glad, Caleb! Pretty good for me.
+
+=== Forget ===
+@ccw
+01:00:09
+spicy-bot: forget
+spicy-bot
+01:00:09
+ccw: Forget what? And who are you?
+
+=== Die ===
+@ccw
+01:00:16
+spicy-bot: die
+spicy-bot
+01:00:16
+ccw: So long and thanks for all the phish...
+← spicy-bot has left (Client Quit)
+
+=== Name All ===
+@ccw
+01:01:22
+spicy-bot: name all
+spicy-bot
+01:01:23
+ccw: Here's all of them: spicy-bot @ccw
