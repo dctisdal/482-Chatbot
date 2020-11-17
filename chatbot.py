@@ -241,7 +241,7 @@ class ChatBot:
         """
         # self.sent_history = []
         # self.recv_history = []
-        self.send_message(user, "See you later.")
+        #self.send_message(user, "See you later.")
         self.user = None
         self.wants_answer = None
         self.state = State.START
@@ -674,7 +674,7 @@ class ChatBot:
                 return
 
 def main():
-    bot = ChatBot(nick="spicy-bot", channel="#CPE482A", timeout=20)
+    bot = ChatBot(nick="spicy-bot", channel="#CPE482", timeout=30)
     bot.run()
     pass
 
